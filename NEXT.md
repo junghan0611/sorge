@@ -24,6 +24,15 @@
   ```
   - `cross_repo` — **25건.** 어느 이슈가 어느 리포들을 거는지. 예: `agent-config#3` 하나가 넷을 건다
   - `board` 57 · `by_repo`(`agent-config` open 12로 제일 두껍다) · `stale_open`(맨 위 `tuyahome#1`, 225일)
+- **열셋이 자기 계약을 못 읽고 있다 — GLG 판정 대기.** `agent-config` 담당자가 넘긴 발견:
+  **Claude Code 는 `CLAUDE.md` 만 자동 발견하고 리포 `AGENTS.md` 를 안 읽는다.**
+  내가 재서 13개 확인 — `aionsclubs` `andenken` `apply` `denotecli` `dictcli` `entwurf`
+  `forge-config` `geworfen` `homeagent-config` `junghan0611` `prime-agent` `workspace-bbot`
+  (이번 달 활동 + `AGENTS.md` 보유 + `CLAUDE.md` 없음. `sorge` 는 방금 닫았다).
+  처방은 `printf '@AGENTS.md\n' > CLAUDE.md` — **11바이트**, 이미 선 16개가 정확히 그 모양이다.
+  - **묻는 것:** 열셋에 내가 직접 넣는가, 담당자에게 건네는가. 계약은 「남의 리포를 대신 고치지
+    않는다」로 서 있고, GLG의 *"다 해줘야돼"* 는 릴레이로 왔다. **판정이 갈릴 여지가 없는 11바이트라도
+    그 선을 내가 마지막에 넘는 것은 GLG가 정할 자리다.**
 - **Next — GLG 지정: `forge` + Datasette 를 이어간다.**
   - **상시로 띄울지 정한다.** 지금은 세션과 함께 죽는다. systemd 로 올릴지, `forge-pull` 뒤에만
     볼지는 `doomemacs-config`(DB 주인)와 정할 자리다.

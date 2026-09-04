@@ -127,6 +127,8 @@
 | 주제 | 판정 | 날짜 | 근거 |
 |---|---|---|---|
 | Clojure 네이티브 | JVM이 아니라 GraalVM `native-image` | 2026-09-04 | GLG가 프로젝트마다 말로 알려주던 것. 선례 7개가 이미 리포 안에 있다 |
+| **Claude Code 에서 리포 `AGENTS.md` 를 읽히려면 `CLAUDE.md` 에 `@AGENTS.md` 한 줄이 필요하다** | pi/ACP 는 `AGENTS.md` 를 직접 읽지만 **Claude Code 는 `CLAUDE.md` 만 자동 발견한다.** 11바이트 |
+2026-09-04 | `agent-config` 담당자의 대조 실험(전달받음)과 **sorge 자신의 실측**. 이 집이 1인칭 증거다 — 오늘 아침 첫 도구 호출이 `cat AGENTS.md` 였고 GLG가 *"먼저 읽어라"* 고 말해줘야 읽었다. 배선을 넣은 뒤 도구를 전부 끊고 물으니 `Fürsorge` 두 갈래를 `AGENTS.md` 에서 답했다. **GLG가 프로젝트마다 말로 알려주던 것이 아니라 아무도 몰라서 아무도 말하지 않던 것** |
 | **스킬 실물은 그 스킬이 의존하는 리포에 산다** | `agent-config` 는 상대형 심링크로 **가리키기만** 한다 — `../../<repo>/.claude/skills/<name>` | 2026-09-04 | GLG 지시로 `forge` 를 이관해 확립됐다. 이제 넷: `voscli` · `incidentcli` · `sorge` · `forge`. **도달 6/6 실측**(2026-09-04, sorge가 직접 잼): `claude` · `pi-skills` · `claude-plugin` · `codex` · `copilot` · `kiro` 전부 `forge-config/.claude/skills/forge/SKILL.md` 로 해석. 근거는 커밋 짝이다 — SKILL.md 와 `bin/forge` 가 다섯 날짜 전부 1:1로 함께 커밋됐다(`forge-config` 담당자 측정). **같은 축이면 하나다** |
 | 이관의 값어치는 파일 위치가 아니라 의무다 | `bin/forge` 를 고치는 커밋이 `SKILL.md` 도 같이 들고 간다 | 2026-09-04 | `forge-config` 담당자가 이관 뒤 자기 `AGENTS.md` 에 못박았다. 옮겨만 놓고 이 의무가 없으면 두 리포 두 커밋이던 시절과 같다 |
 | **`broken` 마커는 2층(명령적 설치) 사유가 아니다** | 먼저 **무엇이 왜 깨지는지** 재고, 우리 용도가 그 경로에 안 닿으면 사유·경계·회수조건을 적은 오버레이로 1층(선언)에 담는다 | 2026-09-04 | `nixos-config` 담당자가 `datasette` 로 확립하고 자기 `AGENTS.md §2.5` 에 박았다. 실측: nixpkgs 가 `asgi-csrf` 를 broken 처리했는데 실제 실패는 `asgi_csrf.py:291` 의 multipart POST 파싱 **한 곳**뿐이고 읽기 전용 브라우징(GET)은 안 닿는다. **그리고 `uv` 로 우회해도 같은 비호환을 그대로 안는다** — `python-multipart 0.0.32` 를 똑같이 끌어오고 게이트만 없다. **우회가 문제를 피한 게 아니라 경고를 껐을 뿐이었다** |
