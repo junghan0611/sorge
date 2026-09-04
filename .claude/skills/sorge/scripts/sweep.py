@@ -100,13 +100,24 @@ def load_ledger():
         print("warn: LEDGER.md not found -- every judgment will read as open",
               file=sys.stderr)
         return judged
-    row = re.compile(r"^\|\s*([A-Za-z0-9._-]+)\s*\|\s*(배정|관리 안 함|보류|불필요)\s*\|\s*([^|]*)\|")
+    row = re.compile(r"^\|\s*([A-Za-z0-9._-]+)\s*\|\s*(배정|관리 안 함|보류|불필요)"
+                     r"\s*\|\s*([^|]*)\|\s*([^|]*)\|\s*([^|]*)\|")
     for line in open(LEDGER, encoding="utf-8"):
         m = row.match(line)
         if not m:
             continue
         note = re.search(r"\b(\d{8}T\d{6})\b", m.group(3))
-        judged[m.group(1).lower()] = (m.group(2), note.group(1) if note else None)
+        # A 곁노트 clause is a judgment the receiving caretaker cannot derive --
+        # "this one is the 왜 layer", "this one is retired, read it as reference
+        # only". Carried verbatim rather than parsed: the sentence is the payload,
+        # and slicing a labelled clause costs nothing to maintain, whereas giving
+        # the ledger a structured column would be a marker to keep alive.
+        # It runs to the end of the cell, so the ledger writes it last. Ending it
+        # at the first period once truncated "폐기 문서다. 참고만 하고" to just
+        # "폐기 문서다" -- dropping the half that told the caretaker what to do.
+        aside = re.search(r"곁노트:\s*(.*)$", m.group(5))
+        judged[m.group(1).lower()] = (m.group(2), note.group(1) if note else None,
+                                      aside.group(1).strip() if aside else None)
     return judged
 
 
@@ -118,7 +129,7 @@ def survey():
         repo = os.path.join(REPOS, name)
         if not os.path.isdir(os.path.join(repo, ".git")):
             continue
-        verdict, note = judged.get(name.lower(), (None, None))
+        verdict, note, aside = judged.get(name.lower(), (None, None, None))
         lastmod = title = None
         ahead = 0
         missing = False
@@ -138,6 +149,7 @@ def survey():
             "last": git(repo, "log", "-1", "--format=%cs"),
             "verdict": verdict,
             "note": note,
+            "aside": aside,
             "note_missing": missing,
             "note_lastmod": lastmod,
             "note_title": title,
@@ -160,29 +172,47 @@ def brief(r, by_id=None):
     L = [f"### {r['repo']}", ""]
     if r["note"] and not r["note_missing"]:
         L.append(f"담당자 문서: [[denote:{r['note']}][{r['note_title']}]] — 대장에 박힌 정본.")
-        L.append(f"마지막 도장 {r['note_lastmod']} 이후 **{r['ahead']}커밋**. "
-                 "그 사이 무엇이 닫혔는지 노트가 모른다.")
-        L.append("`denotecli read <id> --outline` 으로 뼈대 먼저 — 통째로 읽고 다시 쓰지 않는다.")
-        L.append("히스토리 한 줄 + 필요한 헤딩만 덧댄다 (Documents Grow, Not Get Edited).")
-        L.append("쓰는 손은 `botlog` 스킬 — `agent-denote-add-history` / `agent-denote-add-heading`.")
-        L.append("**내용을 실제로 고쳤으면 `agent-denote-set-front-matter` 로 `:hugo_lastmod` 도장을 찍는다.** "
-                 "히스토리 줄만 얹은 것은 수정이 아니고, 도장이 이 빚의 기준선이다.")
+        if r["ahead"]:
+            L.append(f"마지막 도장 {r['note_lastmod']} 이후 **{r['ahead']}커밋**. "
+                     "그 사이 무엇이 닫혔는지 노트가 모른다.")
+            L.append("`denotecli read <id> --outline` 으로 뼈대 먼저 — 통째로 읽고 다시 쓰지 않는다.")
+            L.append("히스토리 한 줄 + 필요한 헤딩만 덧댄다 (Documents Grow, Not Get Edited).")
+            L.append("쓰는 손은 `botlog` 스킬 — `agent-denote-add-history` / `agent-denote-add-heading`.")
+            L.append("**내용을 실제로 고쳤으면 `agent-denote-set-front-matter` 로 `:hugo_lastmod` 도장을 찍는다.** "
+                     "히스토리 줄만 얹은 것은 수정이 아니고, 도장이 이 빚의 기준선이다.")
+        else:
+            # Reached only when GLG named this repo: a quiet repo is never raised
+            # on its own. Saying "the note does not know what closed since" here
+            # would be manufacturing a debt that the count just said is zero.
+            L.append(f"마지막 도장 {r['note_lastmod']} 이후 **0커밋 — 노트가 리포를 따라잡고 있다.**")
+            L.append("갱신할 빚이 없다. 지명받아 나온 블록이므로, 물을 것이 따로 있으면 그것만 묻는다.")
     elif r["note_missing"]:
         L.append(f"대장은 이 리포의 담당자 문서를 `{r['note']}` 로 지목하는데 "
                  f"`{BOTLOG}` 에 그 id가 없다.")
         L.append("**이건 담당자가 갚을 빚이 아니라 대장이 고쳐야 할 자리다.** GLG 확인이 필요하다.")
-    else:
-        L.append("**대장에 없다** — 이 리포를 돌볼지 GLG가 아직 정하지 않았다.")
+    elif r["verdict"]:
+        L.append(f"대장 판정은 `{r['verdict']}` 인데 담당자 문서 id가 아직 비어 있다.")
         L.append(f"마지막 커밋 {r['last']}.")
         if r["cands"]:
             L.append("후보:")
             for c in r["cands"]:
                 t = by_id.get(c, ("", "?", False))[1] if by_id else "?"
                 L.append(f"  - `{c}` — {t}")
-            L.append("이게 맞나 · 다른 노트인가 · 관리 안 하나?")
+            L.append("이게 정본인가 · 다른 노트인가 · 새로 쓸 일인가?")
         else:
-            L.append("제목에 `§` 로 이 리포를 언급하는 노트가 없다. "
-                     "새로 만들 일인가 · 관리 안 할 일인가?")
+            L.append("제목에 `§` 로 이 리포를 언급하는 노트가 없다. 새로 쓸 일인가?")
+    else:
+        # Reached only via --repo on an off-scope repo: GLG asked by name, and
+        # a direct question is not the sweep widening itself.
+        L.append("**대장에 없다 — 대상이 아니다.** 이름을 대고 물었으니 후보만 보인다.")
+        L.append(f"마지막 커밋 {r['last']}.")
+        for c in r["cands"]:
+            t = by_id.get(c, ("", "?", False))[1] if by_id else "?"
+            L.append(f"  - `{c}` — {t}")
+        L.append("대상으로 올릴지는 GLG가 정한다. 순회가 먼저 꺼내지 않는다.")
+    if r["aside"]:
+        L.append("")
+        L.append(f"**대장의 곁노트** — {r['aside']}")
     if not r["mend"]:
         L.append("")
         L.append("자기수선 스킬 없음. 반복되는 수선이 실제로 있는지만 보고, 없으면 만들지 않는다.")
@@ -199,10 +229,10 @@ def main():
     ap.add_argument("--brief", action="store_true", help="dispatchable per-repo blocks")
     ap.add_argument("--repo", help="one repo only")
     ap.add_argument("--debt", type=int, default=15, help="commits-since-note that counts as debt")
-    # 35 days reproduces the first sweep's window (2026-08-01, measured 2026-09-04),
-    # so that measurement stays comparable. Widen it when GLG wants quieter repos judged.
-    ap.add_argument("--recent-days", type=int, default=35,
-                    help="a repo counts as alive if it committed within this many days")
+    # There was a --recent-days window here, feeding a 확인 요청 lane that asked
+    # about every repo committed to lately. GLG removed the premise on
+    # 2026-09-04 -- scope grows only on request -- so recency no longer selects
+    # anything and the flag went with the lane.  See AGENTS.md § 대상.
     a = ap.parse_args()
 
     by_id, _ = index_notes()
@@ -213,17 +243,19 @@ def main():
             print(f"no such repo under {REPOS}: {a.repo}", file=sys.stderr)
             return 2
 
-    cutoff = (datetime.date.today() - datetime.timedelta(days=a.recent_days)).isoformat()
     broken = [r for r in rows if r["note_missing"]]
-    ask = [r for r in rows if not r["verdict"] and r["last"] >= cutoff]
     debt = sorted((r for r in rows if r["note"] and not r["note_missing"]
                    and r["ahead"] >= a.debt), key=lambda r: -r["ahead"])
     quiet = [r for r in rows if r["note"] and not r["note_missing"] and r["ahead"] < a.debt]
     silent = [r for r in rows if r["verdict"] and not r["note"]]
-    dormant = [r for r in rows if not r["verdict"] and r["last"] < cutoff]
+    offscope = [r for r in rows if not r["verdict"]]
 
     if a.brief:
-        for r in broken + ask + debt:
+        # Naming a repo is itself the request: brief it whatever lane it fell in,
+        # including off-scope and 조용함. A bare sweep briefs only what it would
+        # raise on its own -- briefing every target would be the sweep widening
+        # its own scope, and briefing a quiet repo would be manufacturing work.
+        for r in (rows if a.repo else broken + silent + debt):
             print(brief(r, by_id))
         return 0
 
@@ -233,20 +265,18 @@ def main():
         for r in broken:
             print(f"    {r['repo']:24} {r['note']}")
         print()
-    print(f"확인 요청 ({len(ask)})    대장에 없음 + 최근 {a.recent_days}일 내 커밋 — 후보를 들고 GLG에게 묻는다")
-    for r in ask:
-        c = ", ".join(r["cands"]) if r["cands"] else "후보 없음"
-        print(f"    {r['repo']:24} 마지막 커밋 {r['last']}   후보: {c}")
-    print(f"\n빚 ({len(debt)})         리포가 담당자 문서보다 앞서 감")
+    print(f"빚 ({len(debt)})         리포가 담당자 문서보다 앞서 감")
     for r in debt:
         print(f"    {r['repo']:24} {r['ahead']:>4}커밋   {r['note']} (도장 {r['note_lastmod']})")
-    print(f"\n판정됨·문서 없음 ({len(silent)})  대장에 박힘 — 다시 묻지 않는다")
+    print(f"\n문서 미정 ({len(silent)})   대상이나 담당자 문서 id가 비어 있다 — 후보를 들고 묻는다")
     for r in silent:
-        print(f"    {r['repo']:24} {r['verdict']}")
+        c = ", ".join(r["cands"]) if r["cands"] else "후보 없음"
+        print(f"    {r['repo']:24} {r['verdict']}   후보: {c}")
     print(f"\n조용함 ({len(quiet)})      담당자 문서가 리포를 따라잡고 있음")
-    print(f"잠잠함 ({len(dormant)})      대장에 없으나 {a.recent_days}일 내 커밋도 없음 — 아직 묻지 않는다")
+    print(f"\n대상 밖 ({len(offscope)})     대장에 없다 = 대상이 아니다. 묻지 않는다")
+    print("            넓히는 손은 GLG 하나다. 이름을 대고 물으면 --repo <name> 이 답한다.")
     print("\n" + "-" * 60)
-    print("대장이 든 것은 판정뿐이다: 리포 → 담당자 문서 denote id, 또는 관리 안 함.")
+    print("대장이 든 것은 판정뿐이다: 리포 → 담당자 문서 denote id.")
     print("나머지는 전부 여기서 다시 유도했고 저장된 것은 없다.")
     print("다음: --brief 로 형제에게 그대로 건넬 블록을 뽑는다.")
     return 0
