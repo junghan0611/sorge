@@ -16,8 +16,18 @@
 
 # NOW
 
-- **Next — GLG 지정: `forge` + Datasette 에 집중한다.** 오늘은 기반까지만 놓고 닫았다.
-  다음 세션에서 세울 것: **횡단 이슈를 실제로 한 판에 올리는 것.**
+- **횡단 이슈판이 섰다 (2026-09-04 18시, GLG가 보고 승인).** `datasette/metadata.yml` 에 렌즈 넷.
+  띄우는 법 — **`--immutable` 없이**:
+  ```
+  datasette serve ~/doomemacs/.local/etc/forge/forge-database.sqlite \
+    -m ~/repos/gh/sorge/datasette/metadata.yml --port 8071
+  ```
+  - `cross_repo` — **25건.** 어느 이슈가 어느 리포들을 거는지. 예: `agent-config#3` 하나가 넷을 건다
+  - `board` 57 · `by_repo`(`agent-config` open 12로 제일 두껍다) · `stale_open`(맨 위 `tuyahome#1`, 225일)
+- **Next — GLG 지정: `forge` + Datasette 를 이어간다.**
+  - **상시로 띄울지 정한다.** 지금은 세션과 함께 죽는다. systemd 로 올릴지, `forge-pull` 뒤에만
+    볼지는 `doomemacs-config`(DB 주인)와 정할 자리다.
+  - **Forgejo 축을 붙인다.** `forge.junghanacs.com` open 11건은 이 DB에 구조적으로 안 들어온다.
   - GitHub → forge DB read-only. `datasette <db>` **플래그 없이**(아래 금지 참조).
   - Forgejo → REST 직접. `forge.junghanacs.com` open 11건은 forge DB에 **구조적으로** 안 들어온다.
   - **대장은 이슈 상태를 들지 않는다** — 전부 유도 가능하다. 들 것은 「이 이슈 묶음은 한 덩어리다」라는
