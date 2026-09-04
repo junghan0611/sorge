@@ -34,35 +34,6 @@ def git(repo, *args):
     return r.stdout.strip() if r.returncode == 0 else ""
 
 
-def _touched(head):
-    """When was this note last actually touched?
-
-    Two independent stamps live in the note and neither alone is enough.
-    `#+hugo_lastmod` is the garden's stamp, but `agent-denote-add-history`
-    does not raise it -- a caretaker who follows the update procedure exactly
-    (history line + heading) leaves it untouched, and the note would keep
-    reading as stale forever. The newest `* 히스토리` entry is what that
-    procedure DOES write. Take the later of the two: no new marker, both
-    facts already in the note, and a freshly-updated note can never read as
-    debt. Same failure class as the two caught on 2026-09-04 -- reading
-    something that is there as absent.
-    """
-    stamps = []
-    lm = (re.search(r"^#\+hugo_lastmod:\s*\[(\d{4}-\d{2}-\d{2})", head, re.M)
-          or re.search(r"^#\+date:\s*\[(\d{4}-\d{2}-\d{2})", head, re.M))
-    if lm:
-        stamps.append(lm.group(1))
-    hist = re.search(r"^\* (?:히스토리|History)\s*$", head, re.M)
-    if hist:
-        for line in head[hist.end():].split("\n"):
-            if line.startswith("*"):
-                break
-            m = re.match(r"\s*[-+*]\s*\[(\d{4}-\d{2}-\d{2})", line)
-            if m:
-                stamps.append(m.group(1))
-    return max(stamps) if stamps else "0000-00-00"
-
-
 def load_notes():
     """Map repo-name -> (denote-id, lastmod, title), read from the org SSOT.
 
@@ -83,12 +54,19 @@ def load_notes():
     for f in sorted(os.listdir(BOTLOG)):
         if not f.endswith(".org"):
             continue
-        head = open(os.path.join(BOTLOG, f), encoding="utf-8", errors="replace").read(6000)
+        head = open(os.path.join(BOTLOG, f), encoding="utf-8", errors="replace").read(2000)
         t = re.search(r"^#\+title:\s*(.+?)\s*$", head, re.M)
         if not t:
             continue
         ident = re.search(r"^#\+identifier:\s*(\S+)", head, re.M)
-        stamp = _touched(head)
+        # #+hugo_lastmod is GLG's hand-struck stamp meaning "I really revised this
+        # document" -- not a publish concern despite the name. A 히스토리 line is a
+        # log, not a revision, so it must NOT raise the baseline: doing that hid 246
+        # commits of real debt on entwurf (measured and reverted 2026-09-04). The note
+        # that reads as stale under this rule IS stale until its caretaker stamps it.
+        lm = (re.search(r"^#\+hugo_lastmod:\s*\[(\d{4}-\d{2}-\d{2})", head, re.M)
+              or re.search(r"^#\+date:\s*\[(\d{4}-\d{2}-\d{2})", head, re.M))
+        stamp = lm.group(1) if lm else "0000-00-00"
         note_id = ident.group(1) if ident else f.split("--")[0]
         marked = "#담당자" in t.group(1)
         for tok in re.findall(r"§([A-Za-z0-9._-]+)", t.group(1)):
