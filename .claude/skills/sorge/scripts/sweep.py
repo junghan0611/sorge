@@ -18,15 +18,16 @@ while its identifier did not move.
 
 So search still runs -- but it proposes, and the ledger decides.
 """
-import argparse, datetime, os, re, subprocess, sys
+import argparse, datetime, json, os, re, subprocess, sys
 
 HOME = os.path.expanduser("~")
 REPOS = os.path.join(HOME, "repos", "gh")
-# The org tree is the Denote SSOT. The exported md under notes/content lags it by
-# an export cycle -- measured 2026-09-04, when a note renamed at 11:27 still carried
-# its previous title in the export. Reading the export would make a fresh note look
-# absent, which is the one wrong answer this tool must never give.
-BOTLOG = os.path.join(HOME, "org", "botlog")
+# Notes come through `denotecli`, which reads the org tree -- the Denote SSOT.
+# The exported md under notes/content lags it by an export cycle (measured
+# 2026-09-04, when a note renamed at 11:27 still carried its previous title in
+# the export), and reading the export would make a fresh note look absent, which
+# is the one wrong answer this tool must never give. Going through denotecli
+# rather than the directory keeps that rule in ONE place instead of two.
 
 
 def _find_ledger():
@@ -50,7 +51,7 @@ def git(repo, *args):
 
 
 def index_notes():
-    """Read every botlog note once. Returns (by_id, candidates).
+    """Ask denotecli for the botlog notes. Returns (by_id, candidates).
 
     by_id:      denote id -> (lastmod, title, marked)
     candidates: repo token -> [denote id, ...] for notes whose title says §<token>
@@ -61,41 +62,79 @@ def index_notes():
     history entry hid 246 commits of real debt on one repo (tried and reverted
     2026-09-04).
 
+    This used to open every .org under ~/org/botlog and regex the stamp out,
+    because `denotecli` did not expose it. That parallel parser was a copy of a
+    derivable fact -- the exact fault this house spent 2026-09-04 naming -- and
+    it went wrong the way copies do: it read the date and dropped the clock, so
+    a commit made earlier on the stamping day counted as debt (zotero-config
+    measured it: commit 18:32 vs stamp 21:55). GLG had denotecli carry the stamp
+    and the abstract that same day (`3c57689`), so the copy is retired here.
+    Verified before switching: 8/8 stamps identical to what the regex produced.
+
     `candidates` exists only to give an unjudged repo something to ask ABOUT.
     It never decides anything.
     """
     by_id, candidates = {}, {}
-    if not os.path.isdir(BOTLOG):
-        print(f"warn: {BOTLOG} not found -- every note will read as absent",
+    out = subprocess.run(
+        ["denotecli", "search", "§", "--tags", "botlog", "--max", "999"],
+        capture_output=True, text=True)
+    if out.returncode != 0:
+        print(f"warn: denotecli search failed -- every note will read as absent\n{out.stderr}",
               file=sys.stderr)
         return by_id, candidates
-    for f in sorted(os.listdir(BOTLOG)):
-        if not f.endswith(".org"):
-            continue
-        head = open(os.path.join(BOTLOG, f), encoding="utf-8", errors="replace").read(2000)
-        t = re.search(r"^#\+title:\s*(.+?)\s*$", head, re.M)
-        if not t:
-            continue
-        title = t.group(1)
-        ident = re.search(r"^#\+identifier:\s*(\S+)", head, re.M)
-        note_id = ident.group(1) if ident else f.split("--")[0]
-        # Keep the CLOCK, not just the day. `--since=<date>` means 00:00, so a
-        # commit made earlier on the stamping day counts as debt against a stamp
-        # struck that evening. zotero-config measured exactly that: commit
-        # a9b996a at 18:32 vs stamp 21:55 the same day, reported as 1커밋 when the
-        # real debt was 0 (found by that repo's caretaker, verified here 2026-09-04).
-        # A stamp with no clock stays at 00:00 on purpose -- that over-reports
-        # debt, and over-reporting is the safe direction: reading something that
-        # exists as absent is the error this house cannot afford.
-        lm = (re.search(r"^#\+hugo_lastmod:\s*\[(\d{4}-\d{2}-\d{2})[^\]]*?(\d{2}:\d{2})?\]", head, re.M)
-              or re.search(r"^#\+date:\s*\[(\d{4}-\d{2}-\d{2})[^\]]*?(\d{2}:\d{2})?\]", head, re.M))
-        stamp = f"{lm.group(1)} {lm.group(2)}" if lm and lm.group(2) else (lm.group(1) if lm else "0000-00-00")
-        by_id[note_id] = (stamp, title, "#담당자" in title)
-        for tok in re.findall(r"§([A-Za-z0-9._-]+)", title):
-            k = tok.lower().rstrip("-._")
-            if k:
-                candidates.setdefault(k, []).append(note_id)
+    try:
+        notes = json.loads(out.stdout)
+    except json.JSONDecodeError as e:
+        print(f"warn: denotecli returned non-JSON: {e}", file=sys.stderr)
+        return by_id, candidates
+
+    for n in notes:
+        _absorb(by_id, candidates, n)
     return by_id, candidates
+
+
+def _absorb(by_id, candidates, n):
+    """Fold one denotecli note record into the two indexes."""
+    # `header_title` is the org `#+title:` in BOTH commands. `title` is not the
+    # same key twice: `read` returns the front matter there, but `search` returns
+    # the filename slug ("§denotecli-담당자-day-query-…"). Reading `title` would
+    # hand a sibling a slug instead of a title and would break the `#담당자`
+    # marker check, since the slug drops the `#`. Measured 2026-09-04.
+    title = n.get("header_title") or n.get("title") or ""
+    note_id = n.get("id")
+    if not note_id:
+        return
+    # denotecli hands the org timestamp back verbatim: "[2026-09-04 Fri 15:02]".
+    # Keep the clock -- `--since=<date>` means 00:00, so a stamp with no time
+    # stays at 00:00 on purpose. That over-reports debt, and over-reporting is
+    # the safe direction: reading something that exists as absent is the error
+    # this house cannot afford.
+    raw = n.get("hugo_lastmod") or n.get("date") or ""
+    m = re.match(r"\[(\d{4}-\d{2}-\d{2})[^\]]*?(\d{2}:\d{2})?\]", raw)
+    stamp = (f"{m.group(1)} {m.group(2)}" if m and m.group(2)
+             else (m.group(1) if m else "0000-00-00"))
+    by_id[note_id] = (stamp, title, "#담당자" in title)
+    for tok in re.findall(r"§([A-Za-z0-9._-]+)", title):
+        k = tok.lower().rstrip("-._")
+        if k:
+            candidates.setdefault(k, []).append(note_id)
+
+
+def note_by_id(note_id):
+    """One note the search may not have returned -- the ledger can name any id.
+
+    The ledger holds a judgment, and a judgment is not required to live in a
+    note whose title carries §. So a ledger id that the § search misses is not
+    a broken ledger; it is a note titled differently. Ask for it by name.
+    """
+    out = subprocess.run(["denotecli", "read", note_id, "--outline"],
+                         capture_output=True, text=True)
+    if out.returncode != 0:
+        return None
+    try:
+        return json.loads(out.stdout)
+    except json.JSONDecodeError:
+        return None
 
 
 def load_ledger():
@@ -144,6 +183,19 @@ def survey():
         missing = False
         if note:
             hit = by_id.get(note)
+            if not hit:
+                # The § search proposes; the ledger decides. A judgment may name
+                # a note whose title carries no §, and that is not a broken
+                # ledger -- it is a note titled differently. Ask by id before
+                # calling it missing, or the tool reports the ledger as broken
+                # for exercising exactly the freedom the ledger exists to hold.
+                d = note_by_id(note)
+                if d:
+                    # Candidates go to a throwaway: a note fetched by id was
+                    # named by the ledger, so it is already decided and has no
+                    # business proposing itself anywhere.
+                    _absorb(by_id, {}, d)
+                    hit = by_id.get(note)
             if hit:
                 lastmod, title = hit[0], hit[1]
                 c = git(repo, "rev-list", "--count", f"--since={lastmod}", "HEAD")
@@ -197,7 +249,7 @@ def brief(r, by_id=None):
             L.append("갱신할 빚이 없다. 지명받아 나온 블록이므로, 물을 것이 따로 있으면 그것만 묻는다.")
     elif r["note_missing"]:
         L.append(f"대장은 이 리포의 담당자 문서를 `{r['note']}` 로 지목하는데 "
-                 f"`{BOTLOG}` 에 그 id가 없다.")
+                 "`denotecli` 가 그 id를 모른다.")
         L.append("**이건 담당자가 갚을 빚이 아니라 대장이 고쳐야 할 자리다.** GLG 확인이 필요하다.")
     elif r["verdict"]:
         L.append(f"대장 판정은 `{r['verdict']}` 인데 담당자 문서 id가 아직 비어 있다.")
