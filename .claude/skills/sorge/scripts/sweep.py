@@ -79,9 +79,18 @@ def index_notes():
         title = t.group(1)
         ident = re.search(r"^#\+identifier:\s*(\S+)", head, re.M)
         note_id = ident.group(1) if ident else f.split("--")[0]
-        lm = (re.search(r"^#\+hugo_lastmod:\s*\[(\d{4}-\d{2}-\d{2})", head, re.M)
-              or re.search(r"^#\+date:\s*\[(\d{4}-\d{2}-\d{2})", head, re.M))
-        by_id[note_id] = (lm.group(1) if lm else "0000-00-00", title, "#담당자" in title)
+        # Keep the CLOCK, not just the day. `--since=<date>` means 00:00, so a
+        # commit made earlier on the stamping day counts as debt against a stamp
+        # struck that evening. zotero-config measured exactly that: commit
+        # a9b996a at 18:32 vs stamp 21:55 the same day, reported as 1커밋 when the
+        # real debt was 0 (found by that repo's caretaker, verified here 2026-09-04).
+        # A stamp with no clock stays at 00:00 on purpose -- that over-reports
+        # debt, and over-reporting is the safe direction: reading something that
+        # exists as absent is the error this house cannot afford.
+        lm = (re.search(r"^#\+hugo_lastmod:\s*\[(\d{4}-\d{2}-\d{2})[^\]]*?(\d{2}:\d{2})?\]", head, re.M)
+              or re.search(r"^#\+date:\s*\[(\d{4}-\d{2}-\d{2})[^\]]*?(\d{2}:\d{2})?\]", head, re.M))
+        stamp = f"{lm.group(1)} {lm.group(2)}" if lm and lm.group(2) else (lm.group(1) if lm else "0000-00-00")
+        by_id[note_id] = (stamp, title, "#담당자" in title)
         for tok in re.findall(r"§([A-Za-z0-9._-]+)", title):
             k = tok.lower().rstrip("-._")
             if k:
