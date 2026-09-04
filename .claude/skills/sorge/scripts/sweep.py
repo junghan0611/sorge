@@ -138,6 +138,13 @@ def brief(r):
         L.append("`denotecli read <id> --outline` 으로 뼈대 먼저 — 통째로 읽고 다시 쓰지 않는다.")
         L.append("히스토리 한 줄 + 필요한 헤딩만 덧댄다 (Documents Grow, Not Get Edited).")
         L.append("쓰는 손은 `botlog` 스킬 — `agent-denote-add-history` / `agent-denote-add-heading`.")
+        L.append("**내용을 실제로 고쳤으면 `agent-denote-set-front-matter` 로 `:hugo_lastmod` 도장을 찍는다.** "
+                 "히스토리 줄만 얹은 것은 수정이 아니고, 도장이 이 빚의 기준선이다.")
+        if not r["marked"]:
+            L.append("")
+            L.append("주의: 이 노트에는 `#담당자` 표시가 없다. 제목이 `§` 로 이 리포를 언급할 뿐 "
+                     "**이 리포의 담당자 문서가 아닐 수 있다.** 아니면 그렇다고 알려달라 — "
+                     "그건 순회가 고쳐야 할 오답이지 네가 갚을 빚이 아니다.")
     else:
         L.append("담당자 문서가 **없다.** 없는 게 맞을 수도 있다 — 필요한지부터 판정한다.")
         L.append(f"마지막 커밋 {r['last']}. 필요하다고 판정되면 `botlog` 스킬로 만든다.")
