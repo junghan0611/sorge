@@ -76,7 +76,8 @@
 | **조율자 경유 릴레이는 푸시 게이트를 열지 못한다.** 같은 지시를 받은 다섯이 3:2로 갈렸다 | 오늘의 순회 전체. `junghan0611`·`apply` 가 멈췄고 `forge-config`·`zotero-config`·`prime-agent` 가 진행했다 | **모든 조율 레인.** 근거는 `agent-config/home/AGENTS.md:106` — *"This routing rule … does not itself grant implementation, commit, or push approval."* **멈춘 쪽이 문언상 맞다.** GLG 판정 필요 | 2026-09-04 |
 | **`agent-denote-add-heading` 은 TAG와 배치를 동시에 못 받는다.** `:LLMLOG:` 를 달면 파일 끝에 붙어 아카이브 절 뒤로 떨어진다 | `zotero-config` (docstring 실측) | **담당자 문서를 쓰는 모든 집** — 태그 붙은 보고를 넣을 때마다 손으로 옮겨야 한다. 고치는 손은 `agent-config`/`doomemacs-config` (남의 집) | 2026-09-04 |
 | **계획을 현황도 자리에 그리면 같은 낱말이 두 뜻으로 굳는다.** `(앞으로 추가)` 딱지가 붙어 있어도 3개월 뒤엔 아무도 그 딱지를 안 읽는다 | `forge-config` (`thin pointer` 가 파일 수준/CLI 수준 두 뜻으로 굳음) | 구조 다이어그램을 든 모든 집. **`(앞으로 추가)` 딱지 붙은 그림은 냄새다** | 2026-09-04 |
-| **한 표면에서 참인 것을 전 표면의 완료로 보고한다.** 「링크를 걸었다」와 「모든 하네스에 뜬다」는 다른 사건이다 | `agent-config`(아침 「이 기기 sorge 세팅 끝」이 Claude Code 면 기준으로만 참이었다 — 그 집 측정, 전달받음) · `forge-config`(선 적 없는 계획이 현황도 칸에 3개월) | **여러 표면에 나가는 모든 것.** 스킬은 지금 네 면이다 — `~/.claude/skills` · `~/.pi/agent/skills/pi-skills` · `~/.pi/agent/claude-plugin/skills` · `~/.codex/skills`. **2026-09-04 재측정: `sorge` 는 네 면 전부에 있다. 그 구멍은 닫혔다** | 2026-09-04 |
+| **「아직」과 「이미」를 같은 칸에 적으면 3개월 뒤엔 둘이 구별되지 않는다.** 한 표면에서 참인 것을 전 표면의 완료로 보고하는 것도 같은 병이다 | 「링크를 걸었다」와 「모든 하네스에 뜬다」는 다른 사건이다. 셋 다 **문서가 「내가 그 사실의 주인이다」라고 주장한 자리**에서 났다 | `agent-config`(아침 「이 기기 sorge 세팅 끝」이 Claude Code 면 기준으로만 참이었다 — 그 집 측정, 전달받음) · `forge-config`(선 적 없는 계획이 현황도 칸에 3개월) | **여러 표면에 나가는 모든 것.** 스킬은 지금 네 면이다 — `~/.claude/skills` · `~/.pi/agent/skills/pi-skills` · `~/.pi/agent/claude-plugin/skills` · `~/.codex/skills`. **2026-09-04 재측정: `sorge` 는 네 면 전부에 있다. 그 구멍은 닫혔다** | 2026-09-04 |
+| **리포 이름과 스킬 이름이 다르면 배포 루프가 거짓 경고를 낸다.** `run.sh` 의 `LINKED_SKILL_REPOS` 가 둘을 같은 문자열로 썼다 | `agent-config` — `forge-config` 가 `forge` 를 소유하는 첫 사례에서 `skills/forge-config` 를 찾다 실패했다. 링크는 멀쩡한데 경고만 뜬다 (그 집 측정, `forge-config` 경유 전달) | **다음에 「리포 이름 ≠ 스킬 이름」인 집이 심링크 패턴에 합류할 때.** `LINKED_SKILL_NAMES` 매핑으로 고쳤다고 전달받음 | 2026-09-04 |
 | **생성물 위에서 사람의 교정은 하류가 아니라 상류에 둔다.** 안 그러면 다음 rebuild가 되돌린다 | `zotero-config` — `.bib` 여덟 파일이 전부 생성물인데, 고치는 자리는 렌더 결과가 아니라 Zotero 항목이다(`scripts/gen-bibtex.py:183` — *"Existing citationKey on the Zotero item is sacred"*) | 생성물을 드는 모든 집. **사람이 이기는 것은 렌더러와 싸워서가 아니라 렌더러보다 상류에 서기 때문이다** | 2026-09-04 |
 | **순회가 도장 날짜만 읽고 시각을 버렸다.** 도장 찍은 날 그보다 이른 커밋이 빚으로 잡힌다 | `zotero-config` (커밋 18:32 vs 도장 21:55, 빚 1로 오보) | `sorge` 자신. **고쳤다** (2026-09-04, 시각까지 읽는다) | 2026-09-04 |
 
@@ -110,6 +111,10 @@
 | 주제 | 판정 | 날짜 | 근거 |
 |---|---|---|---|
 | Clojure 네이티브 | JVM이 아니라 GraalVM `native-image` | 2026-09-04 | GLG가 프로젝트마다 말로 알려주던 것. 선례 7개가 이미 리포 안에 있다 |
+| **스킬 실물은 그 스킬이 의존하는 리포에 산다** | `agent-config` 는 상대형 심링크로 **가리키기만** 한다 — `../../<repo>/.claude/skills/<name>` | 2026-09-04 | GLG 지시로 `forge` 를 이관해 확립됐다. 이제 넷: `voscli` · `incidentcli` · `sorge` · `forge`. **도달 6/6 실측**(2026-09-04, sorge가 직접 잼): `claude` · `pi-skills` · `claude-plugin` · `codex` · `copilot` · `kiro` 전부 `forge-config/.claude/skills/forge/SKILL.md` 로 해석. 근거는 커밋 짝이다 — SKILL.md 와 `bin/forge` 가 다섯 날짜 전부 1:1로 함께 커밋됐다(`forge-config` 담당자 측정). **같은 축이면 하나다** |
+| 이관의 값어치는 파일 위치가 아니라 의무다 | `bin/forge` 를 고치는 커밋이 `SKILL.md` 도 같이 들고 간다 | 2026-09-04 | `forge-config` 담당자가 이관 뒤 자기 `AGENTS.md` 에 못박았다. 옮겨만 놓고 이 의무가 없으면 두 리포 두 커밋이던 시절과 같다 |
+| 새 이름 이관과 기존 이름 교체는 다르게 발현된다 | `forge` 는 **기존 이름의 실물 교체**라 안 보인 순간이 없었고, `sorge` 는 **새 이름**이라 setup 전까지 세 하네스에서 아예 안 보였다 | 2026-09-04 | `agent-config` 담당자 관측(전달받음). 다음 이관이 이걸 알면 싸다 |
+
 
 ## `#담당자` 표시 — 사람이 읽는 표지이지 조회 수단이 아니다
 

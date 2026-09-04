@@ -27,6 +27,11 @@
 - **푸시 게이트가 다섯을 3:2로 갈랐다.** `agent-config/home/AGENTS.md:106` 이 조율 라우팅은
   그 자체로 푸시 승인을 부여하지 않는다고 명시한다 — **멈춘 쪽(`junghan0611`·`apply`)이 문언상
   맞다.** GLG 판정 대기. 압박하지 않는다: 닫혀 있다고 읽는 것도 유효한 답이다.
+- **`forge` 이관 닫혔다 (2026-09-04).** 실물이 `forge-config/.claude/skills/forge/` 로 갔고
+  `agent-config` 는 상대형 심링크로 가리킨다. **도달 6/6 내가 직접 잼** — claude · pi-skills ·
+  claude-plugin · codex · copilot · kiro 전부 같은 실물로 해석. 이제 sibling 심링크가 넷이다
+  (`voscli` · `incidentcli` · `sorge` · `forge`). **남은 것 하나: `agent-config` `3b9f72e` 가
+  로컬 대기(`ahead 1`)** — 그 집도 GLG 지시를 직접 못 받아 커밋까지만 했다.
 - **나가 있는 담당자 여섯** (보고는 mailbox `20260904T123125-7c716c` 로):
   `apply` `20260904T133615-f7ae0f` · `prime-agent` `20260904T133659-1de49a` ·
   `junghan0611` `20260904T133746-b9589d` · `forge-config` `20260904T133836-6ffe99` ·
