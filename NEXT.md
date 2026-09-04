@@ -39,9 +39,20 @@
 
 ## 이슈판 실측 (2026-09-04, thinkpad) — GLG의 전제가 측정으로 섰다
 
-- forge DB `~/doomemacs/.local/etc/forge/forge-database.sqlite` — 20 repos · **open 53** ·
-  `max(updated)` `2026-09-02T12:31Z`. **open 53 중 32개(60%)가 본문에서 다른 리포를 이름으로 부른다.**
-  SQL 한 방, 네트워크 0.
+- forge DB `~/doomemacs/.local/etc/forge/forge-database.sqlite` — 20 repos ·
+  **open 57 중 25개(44%)가 본문·제목에서 다른 리포를 이름으로 부른다.** SQL 한 방, 네트워크 0.
+  **처음에 60%라고 보고했는데 틀렸다** — 하드코딩한 이름 목록에 `openclaw` 가 섞여 있었고 그건
+  DB의 리포가 아니라 소프트웨어 이름이다. `doomemacs-config` 담당자가 재현 실패로 잡아냈고,
+  DB의 실제 `repository.name` 만 써서 다시 재니 그의 수치와 정확히 일치했다(2026-09-04 실측).
+  **매칭 규칙을 안 밝힌 수치는 재현될 수 없다** — 넘길 때 SQL을 같이 넘긴다.
+- **pull 리듬이 코드 한 곳에 앉았다.** `doomemacs-config` 가 `my/forge-pull-all` 을 만들어 줬다
+  (`lisp/project-config.el`, stale 기본 6시간). 호출: `emacsclient -s user --eval '(my/forge-pull-all)'`.
+  **폴링해도 안전하다** — stale 아니면 API를 안 건드리고 0을 반환한다. 임계값 SSOT는 그 집이다.
+  강제 pull 실측(그 집): issues 148 → 164, open 53 → 57, `max(updated)` 가 오늘 것까지 왔다.
+- **read-only 접속 허가받았다** — `file:<db>?mode=ro`, 조건 셋: `immutable=1` 절대 금지(락을 무시해
+  쓰기 중 페이지를 찢어 읽는다) · `.timeout 5000` · **집계는 raw sqlite로**(emacsql 벡터 DSL은
+  `[:select (max updated)]` 를 조용히 `SELECT updated` 로 컴파일한다 — 에러가 아니라 다른 답이 온다).
+  `journal_mode=delete`, Forge 쪽 `busy_timeout` 20초라 내 짧은 읽기가 Forge를 못 깨뜨린다.
 - `gh api rate_limit` — core 5000/hr, used 0. **호출량은 안 아프다. 아픈 건 질의다.**
 - **Forge는 Forgejo 이슈를 못 가져온다** — `forge-forgejo.el:29` 가 `forge-unusedapi-repository` 를
   상속하고 그 `forge--pull`(`forge-commands.el:173`)은 `magit-git-fetch` 뿐이다. URL 형식표일 뿐이고,
