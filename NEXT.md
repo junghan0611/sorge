@@ -24,15 +24,17 @@
   ```
   - `cross_repo` — **25건.** 어느 이슈가 어느 리포들을 거는지. 예: `agent-config#3` 하나가 넷을 건다
   - `board` 57 · `by_repo`(`agent-config` open 12로 제일 두껍다) · `stale_open`(맨 위 `tuyahome#1`, 225일)
-- **열셋이 자기 계약을 못 읽고 있다 — GLG 판정 대기.** `agent-config` 담당자가 넘긴 발견:
-  **Claude Code 는 `CLAUDE.md` 만 자동 발견하고 리포 `AGENTS.md` 를 안 읽는다.**
-  내가 재서 13개 확인 — `aionsclubs` `andenken` `apply` `denotecli` `dictcli` `entwurf`
-  `forge-config` `geworfen` `homeagent-config` `junghan0611` `prime-agent` `workspace-bbot`
-  (이번 달 활동 + `AGENTS.md` 보유 + `CLAUDE.md` 없음. `sorge` 는 방금 닫았다).
-  처방은 `printf '@AGENTS.md\n' > CLAUDE.md` — **11바이트**, 이미 선 16개가 정확히 그 모양이다.
-  - **묻는 것:** 열셋에 내가 직접 넣는가, 담당자에게 건네는가. 계약은 「남의 리포를 대신 고치지
-    않는다」로 서 있고, GLG의 *"다 해줘야돼"* 는 릴레이로 왔다. **판정이 갈릴 여지가 없는 11바이트라도
-    그 선을 내가 마지막에 넘는 것은 GLG가 정할 자리다.**
+- **배선 닫혔다 (2026-09-04 18:30, GLG 지시로 sorge가 대신 넣었다).**
+  `agent-config` 담당자가 넘긴 발견 — **Claude Code 는 `CLAUDE.md` 만 자동 발견하고 리포
+  `AGENTS.md` 를 안 읽는다.** pi/ACP 는 읽는다. 그래서 담당자들이 자기 계약을 못 읽은 채
+  일해 왔다(`entwurf` 실측: 세션 112개 중 자동 주입 0, 직접 연 것 31).
+  **11개 리포에 `printf '@AGENTS.md\n' > CLAUDE.md` 11바이트씩, 커밋·푸시 완료. 11/11 synced.**
+  `sorge` 는 그 전에 자기 집을 닫았고, `agent-config`·`cos` 는 각자 닫았다.
+  - **`entwurf` 하나 남았다** — GLG가 뺐다(오라클에서 릴리즈 작업 중, 2026-09-04).
+    그 작업이 끝나면 같은 11바이트를 넣으면 된다.
+  - **이건 「남의 리포를 대신 고치지 않는다」의 예외였고, GLG가 이 세션에서 직접 열었다.**
+    판정이 갈릴 여지가 없는 배선이고, 배선이 없으면 담당자가 자기 몫을 못 받는다 —
+    그의 계약을 그가 못 읽으니까. 예외를 상례로 읽지 않는다.
 - **Next — GLG 지정: `forge` + Datasette 를 이어간다.**
   - **상시로 띄울지 정한다.** 지금은 세션과 함께 죽는다. systemd 로 올릴지, `forge-pull` 뒤에만
     볼지는 `doomemacs-config`(DB 주인)와 정할 자리다.
