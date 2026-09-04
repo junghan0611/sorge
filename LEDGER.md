@@ -76,6 +76,8 @@
 | **조율자 경유 릴레이는 푸시 게이트를 열지 못한다.** 같은 지시를 받은 다섯이 3:2로 갈렸다 | 오늘의 순회 전체. `junghan0611`·`apply` 가 멈췄고 `forge-config`·`zotero-config`·`prime-agent` 가 진행했다 | **모든 조율 레인.** 근거는 `agent-config/home/AGENTS.md:106` — *"This routing rule … does not itself grant implementation, commit, or push approval."* **멈춘 쪽이 문언상 맞다.** GLG 판정 필요 | 2026-09-04 |
 | **`agent-denote-add-heading` 은 TAG와 배치를 동시에 못 받는다.** `:LLMLOG:` 를 달면 파일 끝에 붙어 아카이브 절 뒤로 떨어진다 | `zotero-config` (docstring 실측) | **담당자 문서를 쓰는 모든 집** — 태그 붙은 보고를 넣을 때마다 손으로 옮겨야 한다. 고치는 손은 `agent-config`/`doomemacs-config` (남의 집) | 2026-09-04 |
 | **계획을 현황도 자리에 그리면 같은 낱말이 두 뜻으로 굳는다.** `(앞으로 추가)` 딱지가 붙어 있어도 3개월 뒤엔 아무도 그 딱지를 안 읽는다 | `forge-config` (`thin pointer` 가 파일 수준/CLI 수준 두 뜻으로 굳음) | 구조 다이어그램을 든 모든 집. **`(앞으로 추가)` 딱지 붙은 그림은 냄새다** | 2026-09-04 |
+| **한 표면에서 참인 것을 전 표면의 완료로 보고한다.** 「링크를 걸었다」와 「모든 하네스에 뜬다」는 다른 사건이다 | `agent-config`(아침 「이 기기 sorge 세팅 끝」이 Claude Code 면 기준으로만 참이었다 — 그 집 측정, 전달받음) · `forge-config`(선 적 없는 계획이 현황도 칸에 3개월) | **여러 표면에 나가는 모든 것.** 스킬은 지금 네 면이다 — `~/.claude/skills` · `~/.pi/agent/skills/pi-skills` · `~/.pi/agent/claude-plugin/skills` · `~/.codex/skills`. **2026-09-04 재측정: `sorge` 는 네 면 전부에 있다. 그 구멍은 닫혔다** | 2026-09-04 |
+| **생성물 위에서 사람의 교정은 하류가 아니라 상류에 둔다.** 안 그러면 다음 rebuild가 되돌린다 | `zotero-config` — `.bib` 여덟 파일이 전부 생성물인데, 고치는 자리는 렌더 결과가 아니라 Zotero 항목이다(`scripts/gen-bibtex.py:183` — *"Existing citationKey on the Zotero item is sacred"*) | 생성물을 드는 모든 집. **사람이 이기는 것은 렌더러와 싸워서가 아니라 렌더러보다 상류에 서기 때문이다** | 2026-09-04 |
 | **순회가 도장 날짜만 읽고 시각을 버렸다.** 도장 찍은 날 그보다 이른 커밋이 빚으로 잡힌다 | `zotero-config` (커밋 18:32 vs 도장 21:55, 빚 1로 오보) | `sorge` 자신. **고쳤다** (2026-09-04, 시각까지 읽는다) | 2026-09-04 |
 
 첫 줄이 가장 무겁다. **sorge의 창립 규율이 한 층 밖에서 깨진 것이기 때문이다** — 대장은
@@ -89,6 +91,13 @@
 가리키지 마라.** `NEXT--<branch>.md` 는 승격되면 사라지는 이름이고 `NEXT.md` 는 안 움직인다.
 노트 제목은 하루에도 움직이고 `#+identifier` 는 안 움직인다. 처방이 「사본을 동기화해라」였다면
 관리 대상이 하나 더 생겼을 뿐이다.
+
+`prime-agent` 가 그 줄이 자랄 방향도 하나 남겼다(그의 해석, 채택 보류). 「포인터가 낡는다」와
+「검사가 낡는다」가 같은 뿌리라는 것 — 둘 다 *한 번 세워두면 계속 참일 것*이라는 가정에서 난다.
+원탁에서 세 집이 같은 자리를 물어왔다: `apply` 의 fail-open 검사기(꾸며 적은 행을 건너뛰며 `ok`),
+`dictcli` 의 `validate` 가 3,989 트리플을 0 errors 로 통과시킨 것, `prime-agent` 의 안 무는 green.
+**셋 다 「검사가 있다」가 「검사되었다」로 읽힌 자리다.** 레인을 늘리지는 않는다 — 레인 하나가
+관리 대상 하나이고, 그건 이 집의 규율이다. 방향만 남긴다.
 
 그리고 그 규칙은 같은 날 세 집에서 **증명됐다.** 다섯 중 넷이 `:rename t` 로 노트를 개명했고,
 매번 제목·슬러그·파일명이 전부 움직이고 `#+identifier` 만 남았다. `zotero-config` 는 자기
