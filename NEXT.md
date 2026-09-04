@@ -17,11 +17,8 @@
 # NOW
 
 - **횡단 이슈판이 섰다 (2026-09-04 18시, GLG가 보고 승인).** `datasette/metadata.yml` 에 렌즈 넷.
-  띄우는 법 — **`--immutable` 없이**:
-  ```
-  datasette serve ~/doomemacs/.local/etc/forge/forge-database.sqlite \
-    -m ~/repos/gh/sorge/datasette/metadata.yml --port 8071
-  ```
+  띄우는 법 — **`./run.sh board`** (또는 메뉴에서 `b`). `--immutable` 은 안 붙는다.
+  `./run.sh` 는 손잡이일 뿐이다 — 판정은 `LEDGER.md`, 순회 논리는 `sweep.py` 가 든다.
   - `cross_repo` — **25건.** 어느 이슈가 어느 리포들을 거는지. 예: `agent-config#3` 하나가 넷을 건다
   - `board` 57 · `by_repo`(`agent-config` open 12로 제일 두껍다) · `stale_open`(맨 위 `tuyahome#1`, 225일)
 - **배선 닫혔다 (2026-09-04 18:30, GLG 지시로 sorge가 대신 넣었다).**
