@@ -9,7 +9,11 @@ import argparse, os, re, subprocess, sys
 
 HOME = os.path.expanduser("~")
 REPOS = os.path.join(HOME, "repos", "gh")
-BOTLOG = os.path.join(HOME, "repos", "gh", "notes", "content", "botlog")
+# The org tree is the Denote SSOT. The exported md under notes/content lags it by
+# an export cycle -- measured 2026-09-04, when a note renamed at 11:27 still carried
+# its previous title in the export. Reading the export would make a fresh note look
+# absent, which is the one wrong answer this tool must never give.
+BOTLOG = os.path.join(HOME, "org", "botlog")
 def _find_ledger():
     """Walk up to the repo root. A wrong path here would silently report every
     settled judgment as an open question -- the one failure this tool must not have."""
@@ -31,23 +35,43 @@ def git(repo, *args):
 
 
 def load_notes():
-    """Map repo-name -> (denote-id, lastmod). Derived from the §<repo> title convention."""
+    """Map repo-name -> (denote-id, lastmod, title), read from the org SSOT.
+
+    Two conventions, and they are different facts. A §<repo> token in the title
+    means the note is ABOUT that repo. A `#담당자` token means the note IS that
+    repo's caretaker document. A marked note always wins over an unmarked one --
+    otherwise a topic note that merely mentions four repos would be mistaken for
+    the caretaker doc of all four (measured 2026-09-04: it was).
+
+    A trailing separator is stripped, so "§sorge #담당자", "§sorge:" and
+    "§sorge-담당자" all name `sorge`.
+    """
     out = {}
     if not os.path.isdir(BOTLOG):
+        print(f"warn: {BOTLOG} not found -- every note will read as absent",
+              file=sys.stderr)
         return out
     for f in sorted(os.listdir(BOTLOG)):
-        if not f.endswith(".md"):
+        if not f.endswith(".org"):
             continue
-        head = open(os.path.join(BOTLOG, f), encoding="utf-8").read(2000)
-        t = re.search(r'^title: "(.*)"', head, re.M)
+        head = open(os.path.join(BOTLOG, f), encoding="utf-8", errors="replace").read(2000)
+        t = re.search(r"^#\+title:\s*(.+?)\s*$", head, re.M)
         if not t:
             continue
-        lm = re.search(r"^lastmod: (\S+)", head, re.M) or re.search(r"^date: (\S+)", head, re.M)
-        stamp = lm.group(1)[:10] if lm else "0000-00-00"
+        ident = re.search(r"^#\+identifier:\s*(\S+)", head, re.M)
+        lm = (re.search(r"^#\+hugo_lastmod:\s*\[(\d{4}-\d{2}-\d{2})", head, re.M)
+              or re.search(r"^#\+date:\s*\[(\d{4}-\d{2}-\d{2})", head, re.M))
+        stamp = lm.group(1) if lm else "0000-00-00"
+        note_id = ident.group(1) if ident else f.split("--")[0]
+        marked = "#담당자" in t.group(1)
         for tok in re.findall(r"§([A-Za-z0-9._-]+)", t.group(1)):
-            k = tok.lower()
-            if k not in out or stamp > out[k][1]:
-                out[k] = (f[:-3], stamp, t.group(1))
+            k = tok.lower().rstrip("-._")
+            if not k:
+                continue
+            cur = out.get(k)
+            # marked beats unmarked; within the same class, newer wins
+            if cur is None or (marked, stamp) > (cur[3], cur[1]):
+                out[k] = (note_id, stamp, t.group(1), marked)
     return out
 
 
@@ -82,6 +106,7 @@ def survey():
             "last": git(repo, "log", "-1", "--format=%cs"),
             "note": hit[0] if hit else None,
             "note_lastmod": hit[1] if hit else None,
+            "marked": hit[3] if hit else False,
             "ahead": ahead,
             "mend": os.path.isdir(os.path.join(repo, ".claude", "skills")),
             "judged": judged.get(name.lower(), set()),
@@ -93,7 +118,8 @@ def brief(r):
     """One dispatchable block -- hand this to that repo's caretaker as-is."""
     L = [f"### {r['repo']}", ""]
     if r["note"]:
-        L.append(f"담당자 문서 `{r['note']}` — lastmod {r['note_lastmod']} 이후 **{r['ahead']}커밋**.")
+        kind = "담당자 문서" if r["marked"] else "§노트(#담당자 미표시)"
+        L.append(f"{kind} `{r['note']}` — lastmod {r['note_lastmod']} 이후 **{r['ahead']}커밋**.")
         L.append("그 사이 무엇이 닫혔는지 노트가 모른다. 히스토리 한 줄과 필요한 헤딩만 덧댄다")
         L.append("(통째로 다시 쓰지 않는다 — Documents Grow, Not Get Edited).")
     else:
@@ -137,7 +163,12 @@ def main():
         print(f"    {r['repo']:24} 마지막 커밋 {r['last']}")
     print(f"\n빚 ({len(debt)})         리포가 노트보다 앞서 감")
     for r in debt:
-        print(f"    {r['repo']:24} {r['ahead']:>4}커밋   {r['note']} ({r['note_lastmod']})")
+        tag = "담당자" if r["marked"] else "미표시"
+        print(f"    {r['repo']:24} {r['ahead']:>4}커밋   {r['note']} ({r['note_lastmod']}) [{tag}]")
+    unmarked = [r for r in rows if r["note"] and not r["marked"]]
+    print(f"\n미표시 ({len(unmarked)})     §노트는 있으나 #담당자 표시가 없음 — 표시할지 GLG가 정한다")
+    for r in unmarked:
+        print(f"    {r['repo']:24} {r['note']}")
     print(f"\n판정됨 ({len(settled)})     대장에 박힘 — 다시 묻지 않는다")
     for r in settled:
         print(f"    {r['repo']:24} {'/'.join(sorted(r['judged']))}")
