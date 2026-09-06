@@ -12,32 +12,51 @@
 
 # NOW
 
-- **Next — `sorge#1` 반환을 받아 접는다.** `andenken` 담당자(garden `20260906T151837-b69a3d`,
-  Claude Code Opus, tmux `@82`)가 2026-09-06 15:18 에 열렸다. 반환이 오면 ① receipt 를 thinkpad 에서
-  재확인 ② 본문에 접기 ③ 남은 것 세우기. **이 집의 일은 그것뿐이다 — 코드는 그 집이 고친다.**
-- **`sorge#1` 판** (2026-09-06 현재):
+- **Next — `sorge#1` 은 하루에 세 집을 돌고 남은 넷을 남겼다.** 이 집 몫은 다음 반환이 올 때
+  ① receipt 를 여기서 재확인 ② 본문에 접기 ③ 판정만 남기기. **코드는 그 집들이 고친다.**
 
-  | 조건 | 집 | 상태 |
-  |---|---|---|
-  | 3 authority·ro 선언 | `nixos-config` | ✅ [`1f6c75f`](https://github.com/junghan0611/nixos-config/commit/1f6c75f) |
-  | 2a 진입점 absent 응답 | `agent-config` | ✅ [`ad347ef`](https://github.com/junghan0611/agent-config/commit/ad347ef) (push 확인) |
-  | 2b 불변식 · 1·4 B층 | `andenken` | 진행 중 |
-  | 5·6 A층(dirty/timeout · 캐시 63% orphan) | `nixos-config` | 8.2 soak 이후로 그 집이 잡음 |
-  | 7 oracle receipt | 컨테이너 | **GLG 손** — oracle 에서 직접 부른다 |
+## `sorge#1` — 2026-09-06 하루의 결과
 
-- **오늘 얻은 횡단 발견 — 다음 순회의 축이다.** `nixos-config` 의 `ORACLE.md`(mount 표가 rw 로 남아
-  실물을 못 따라감)와 `agent-config` 의 `SKILL.md:57`(*"this machine"* 이라 써서 심링크 너머 oracle 에서
-  반대로 읽힘)이 **같은 고장을 독립으로 냈다.** 둘 다 "문서를 믿은 소비자가 벽에 부딪힌" 사고다.
-  → **규칙: 호스트 상대 표현을 쓰지 않고 호스트를 이름으로 부른다.**
-  **다음 순회에서 다른 집 문서에도 걸리는지 본다** — 이게 리포 하나가 가질 수 없는 시야이고 이 집이 있는 이유다.
-- **더 값나가는 쪽 하나 더**: 축이 없는 **writable** 호스트에서 `search-openclaw` 는 빈 인덱스를 조용히 만들고
-  `count:0` · exit 0 을 준다 — *"봇이 그런 말 한 적 없다"* 와 구분 불가. **oracle 의 EROFS 는 시끄러워서
-  이슈가 열린 운 좋은 쪽이었다.** 파생: mount 를 rw 로 넓혔다면 버그는 고쳐지는 게 아니라 조용해졌다.
-- **지금 서 있는 것:** `./run.sh board` → http://127.0.0.1:8071 · 렌즈 넷
-  (`cross_repo` 26건 · `board` 58 · `by_repo` · `stale_open`). DB 는 GLG 의 Emacs 가 오늘 14:39 에 갱신했다.
-- **`junghan0611` 담당자 문서에 README 사본이 아직 있고 diff 가 137줄로 벌어졌다.**
-  그 집이 「동기화하지 않는다」를 판정으로 박았으니 결함은 아니다. 다만 **사본 블록을
-  걷어내고 리포를 가리키기만 하는 게 낫지 않은가**는 그 집에 리드로 건넬 자리다.
+| 조건 | 집 | 상태 |
+|---|---|---|
+| 3 authority·ro 선언 | `nixos-config` | ✅ [`1f6c75f`](https://github.com/junghan0611/nixos-config/commit/1f6c75f) |
+| 2a 진입점 absent 응답 | `agent-config` | ✅ [`ad347ef`](https://github.com/junghan0611/agent-config/commit/ad347ef) |
+| 2b 불변식 · 1 B층 | `andenken` | ✅ [`1e61698`](https://github.com/junghan0611/andenken/commit/1e61698) |
+| 7 양쪽 검증 | `nixos-config` | ✅ [`55ef65d`](https://github.com/junghan0611/nixos-config/commit/55ef65d) |
+| 5 dirty·timeout | `nixos-config` | ✅ [`883cee2`](https://github.com/junghan0611/nixos-config/commit/883cee2) |
+| **6 기억축 복구** | `nixos-config` | **열림 — GLG 판정으로 승급** |
+| 4 MD 축 freshness | `andenken` | 열림 |
+| 9 wrapper 은퇴 | `agent-config` | 조건 둘 다 섬 · GLG 허가 대기 |
+| **10 제공자 오류 원인** | **미정** | **열림** |
+
+- **가장 큰 것: 6봇 중 5봇이 자기 기억축에 못 닿는다.** mini 8.0s / gpt 32.5s / bbot 43.3s /
+  **glg 85.4s**, embedding 바이트에 선형(≈0.5초/MB). 봇 도구 게이트는 15초다.
+  **GLG 판정: 85초는 특성이 아니라 고장이다.** 그래서 6번이 「캐시 정리」에서 **「기억축 복구」로 승급**했다.
+  **잘 쓸수록 자기 기억에 못 닿는 구조** — 이 판에서 가장 아픈 자리다.
+- **오늘의 방법론적 교훈 하나: 이 판은 하루 종일 §3 의 *요약* 위에서 돌았다.**
+  `sorge` 가 openclaw 축에서 원문을 꺼내고서야 한가운데로 왔다 —
+  *"임베딩 제공자 오류로 현재 의미 검색이 비활성 상태입니다"*(gpt, 2026-09-03).
+  **「소스로 브리핑하라」를 형제들에게는 매번 붙여 보내면서, 이슈 자체는 요약 위에서 굴렸다.**
+  다음 coord 이슈는 **원문 인용에서 시작한다.**
+
+## 다음 순회가 물어야 할 축 — 오늘 다섯 집에서 얻은 것
+
+**A. 좌표를 프레임 없이 적는 고장** (`sorge#1` C-11 표, 넷이 독립으로 났다)
+
+| 어디 | 빠진 프레임 |
+|---|---|
+| `nixos-config` `ORACLE.md` mount 표 | 리비전 |
+| `agent-config` `SKILL.md` "this machine" | 호스트 |
+| `andenken` `status` 의 라벨 없는 UTC | 타임존 |
+| 형제가 편집 중인 파일의 `file:line` | 리비전 |
+
+→ **호스트는 이름으로 · 시각은 KST 라벨과 함께 · `file:line` 에는 스냅샷 앵커(sha 또는 mtime).**
+**다음 순회에서 다른 집 문서에도 걸리는지 본다.**
+
+**B. 조용한 오답이 시끄러운 실패보다 위험하다**
+축 없는 writable 호스트의 `count:0 exit 0` · `verify openclaw` 가 org 숫자를 자기 이름으로 찍던 것 ·
+`| tail -5` 가 exit code 를 삼켜 멀쩡한 게이트가 깨져 보인 것(C-13). **셋 다 실패가 성공처럼 보였다.**
+→ 순회가 "에러 없음" 을 건강 신호로 읽지 않는다.
 
 ## 이슈판 실측 (2026-09-04, thinkpad) — GLG의 전제가 측정으로 섰다
 
