@@ -6,21 +6,35 @@
 
 > 1~8 은 닫혔고 `CHANGELOG.md` `v2026.9.4` 로 갔다 — 집·계약·대장·첫 순회·이슈판 기반.
 
-- [ ] **9. forge + Datasette** ← CURRENT: 이슈판을 실제로 세운다
+- [x] **9. forge + Datasette** — 이슈판이 섰다. `./run.sh board` → `127.0.0.1:8071`, 렌즈 넷
 - [ ] **10. Forgejo 축** — `forge.junghanacs.com` open 11건. 이 캐시엔 구조적으로 안 들어온다
+- [ ] **11. coord 이슈를 실제로 굴린다** ← CURRENT: `sorge#1` 이 세 집을 물고 도는 중
 
 # NOW
 
-- **Next — RAIL 9: 이슈판을 실제로 세운다.** 기반은 `v2026.9.4` 로 닫혔다. 남은 것 둘:
-  - **상시로 띄울지 정한다.** 지금은 `./run.sh board` 로 띄우고 세션과 함께 죽는다.
-    systemd 로 올릴지, `forge-pull` 뒤에만 볼지는 `doomemacs-config`(DB 주인)와 정할 자리다.
-  - **Forgejo 축을 붙인다** (RAIL 10). `forge.junghanacs.com` open 11건은 이 캐시에
-    **구조적으로** 안 들어온다 — REST 로 따로 든다.
+- **Next — `sorge#1` 반환을 받아 접는다.** `andenken` 담당자(garden `20260906T151837-b69a3d`,
+  Claude Code Opus, tmux `@82`)가 2026-09-06 15:18 에 열렸다. 반환이 오면 ① receipt 를 thinkpad 에서
+  재확인 ② 본문에 접기 ③ 남은 것 세우기. **이 집의 일은 그것뿐이다 — 코드는 그 집이 고친다.**
+- **`sorge#1` 판** (2026-09-06 현재):
+
+  | 조건 | 집 | 상태 |
+  |---|---|---|
+  | 3 authority·ro 선언 | `nixos-config` | ✅ [`1f6c75f`](https://github.com/junghan0611/nixos-config/commit/1f6c75f) |
+  | 2a 진입점 absent 응답 | `agent-config` | ✅ [`ad347ef`](https://github.com/junghan0611/agent-config/commit/ad347ef) (push 확인) |
+  | 2b 불변식 · 1·4 B층 | `andenken` | 진행 중 |
+  | 5·6 A층(dirty/timeout · 캐시 63% orphan) | `nixos-config` | 8.2 soak 이후로 그 집이 잡음 |
+  | 7 oracle receipt | 컨테이너 | **GLG 손** — oracle 에서 직접 부른다 |
+
+- **오늘 얻은 횡단 발견 — 다음 순회의 축이다.** `nixos-config` 의 `ORACLE.md`(mount 표가 rw 로 남아
+  실물을 못 따라감)와 `agent-config` 의 `SKILL.md:57`(*"this machine"* 이라 써서 심링크 너머 oracle 에서
+  반대로 읽힘)이 **같은 고장을 독립으로 냈다.** 둘 다 "문서를 믿은 소비자가 벽에 부딪힌" 사고다.
+  → **규칙: 호스트 상대 표현을 쓰지 않고 호스트를 이름으로 부른다.**
+  **다음 순회에서 다른 집 문서에도 걸리는지 본다** — 이게 리포 하나가 가질 수 없는 시야이고 이 집이 있는 이유다.
+- **더 값나가는 쪽 하나 더**: 축이 없는 **writable** 호스트에서 `search-openclaw` 는 빈 인덱스를 조용히 만들고
+  `count:0` · exit 0 을 준다 — *"봇이 그런 말 한 적 없다"* 와 구분 불가. **oracle 의 EROFS 는 시끄러워서
+  이슈가 열린 운 좋은 쪽이었다.** 파생: mount 를 rw 로 넓혔다면 버그는 고쳐지는 게 아니라 조용해졌다.
 - **지금 서 있는 것:** `./run.sh board` → http://127.0.0.1:8071 · 렌즈 넷
-  (`cross_repo` 25건 · `board` 57 · `by_repo` · `stale_open`).
-  `agent-config#3` 하나가 네 리포를 건다 — 그게 이 판을 만든 이유다.
-- **`entwurf` 만 배선이 남았다.** GLG가 뺐다(오라클 릴리즈 중, 2026-09-04).
-  릴리즈가 끝나면 `printf '@AGENTS.md\n' > CLAUDE.md` 한 줄이면 된다.
+  (`cross_repo` 26건 · `board` 58 · `by_repo` · `stale_open`). DB 는 GLG 의 Emacs 가 오늘 14:39 에 갱신했다.
 - **`junghan0611` 담당자 문서에 README 사본이 아직 있고 diff 가 137줄로 벌어졌다.**
   그 집이 「동기화하지 않는다」를 판정으로 박았으니 결함은 아니다. 다만 **사본 블록을
   걷어내고 리포를 가리키기만 하는 게 낫지 않은가**는 그 집에 리드로 건넬 자리다.
@@ -72,6 +86,9 @@
   표시는 사람이 읽는 표지이지 순회의 조회 수단이 아니므로 급하지 않다. 붙일 때 형식도 같이.
 - **이슈 레인의 모양.** 순회가 리포 넘나드는 이슈 관계를 보게 될 텐데, 그것을 여기
   이슈로 옮기는가 아니면 브리핑에만 싣는가. 대장이 차고 나서 정한다.
+  **2026-09-06 에 한 번 답이 나왔다 — `sorge#1` 이 그 판본이다.** 세 집이 각자 커밋으로 반환하고,
+  이 집은 본문에 정정·증거만 접었다. 다만 이 이슈는 **GLG가 준 것**이지 순회가 발견한 것이 아니다.
+  순회가 스스로 발견한 것에도 같은 모양이 맞는지는 아직 모른다.
 - **오라클과 리포 수가 다르다.** oracle 52 / thinkpad 71. 대장이 대상을 들게 된 지금은
   판정이 같으므로 순회 결과도 같지만, 대상을 넓힐 때 후보가 기기마다 다르게 보일 수는 있다.
 - **순회 주기.** 지금은 GLG가 부를 때만이다. 주기를 만들면 그 주기가 관리 대상이 되므로,
