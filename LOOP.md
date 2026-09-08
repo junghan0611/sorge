@@ -19,9 +19,9 @@ sorge 자신은 코드를 고치지 않고, 이슈에 답글도 달지 않는다
 
 ## worker
 
-- harness: `claude --remote-control --model sonnet --effort high`
+- harness: `claude --remote-control --model opus` (GLG, 2026-09-07 21:2x: *"오푸스 sorge를 루프로"* — sonnet 에서 바꿈)
 - 자리: tmux 세션 `sorge`, cwd `~/repos/gh/sorge`
-- 잠들어 있다가 두드리면 한 턴 일하고 다시 잔다. 스스로 이어가지 않는다.
+- 잠들어 있다가 두드리면 한 턴 일하고 다시 잔다. 스스로 판단해 이어가지 않는다 — 시계가 두드린다.
 
 ## watch — 무엇을 보는가
 
@@ -37,7 +37,10 @@ gh search issues --owner junghan0611 --state open --limit 100 \
 - `sorge#N` 은 대개 남의 집 얘기다 → `house` 를 일이 일어나는 집으로 잡고, **그 집이 대장에 있으면** 대상
 - 그 밖은 `verdict=보류(대상 아님)` 한 줄로 조용히 닫는다. 세지도 묻지도 않는다 — GLG 가 넓힐 때만 다시 뜬다
 
-Forgejo(`forge.junghanacs.com`)는 아직 범위 밖이다 — 붙일 때 여기에 줄을 추가한다.
+**Forgejo(`forge.junghanacs.com`)는 범위 밖이고, 붙이지 않는다.** 전에 여기 "아직 범위 밖이다 — 붙일 때
+여기에 줄을 추가한다" 라고 적혀 있었다. GLG 가 2026-09-08 에 그 문을 닫았다 — *"forgejo는 대상에서 아예
+빼자. 내가 생각하는 그림은 forgejo github gitlab 이런거랑 상관없다."* **watch 는 `gh search` 한 축만
+본다.** 이 줄은 붙일 자리가 아니라 붙이지 않기로 한 판정이다.
 
 ## done_when — 재실행 가능한 명령만. 산문 금지
 
@@ -49,8 +52,11 @@ Forgejo(`forge.junghanacs.com`)는 아직 범위 밖이다 — 붙일 때 여기
 
 ## cadence
 
-- 기본 30분, 조용한 시간 23:00–08:00 (Asia/Seoul) 은 쉰다
-- 한 tick에 **분류 최대 5개**. 다 못 하면 다음 tick으로 넘긴다
+- 기본 30분, 조용한 시간 23:00–08:00 (Asia/Seoul) 은 쉰다.
+  **첫 밤(2026-09-07→08) 은 예외** — GLG: *"자는 동안 작업 좀 하게."* 밤새 돈다. 아침에 재고 되돌릴지 정한다
+- 한 tick에 **분류 최대 5개 — 대상 이슈 기준.** 대장 밖 리포의 이슈는 판정이 없는 `보류(대상 아님)`
+  한 줄이라 상한에 안 센다 — 한 tick 에 전부 닫아도 된다. (worker 실측 2026-09-07 22:56: 미분류 73 중
+  대상 8, 나머지 65 를 5개씩 닫으면 13 tick 을 정보 없는 줄에 쓴다. 「세지도 묻지도 않는다」 와 같은 뜻)
 - **동시에 살아 있는 attempt 는 1개(WIP=1).** 첫 pilot 이라서다 — 깨어남·회신·검수·교대의 실제 수명을
   하나로 재고 나서 올린다. 30분은 시민의 TTL 이 아니라 worker 의 관측 주기다: 시도가 tick 을 넘겨도
   죽이지도, 다음 tick 이 재발사하지도 않는다
@@ -168,8 +174,10 @@ verdict=담당자몫 ∧ house∈대장 ∧ authority≤쓰기 ∧ reversible=�
 
 ## driver — 두드리는 손
 
-지금은 사람이 두드린다(agent-config 담당자). 그건 관측 가능한 수동 pilot 이지 아직 「GLG 손을 떠난」
-오토파일럿이 아니다. 시계를 달 때 허용되는 전부는 이것이다:
+낮에는 사람이 두드렸다(agent-config 담당자). **첫 밤은 worker 자신의 하네스 `/loop 30m` 이 시계다** —
+새 코드 0줄이고 고정 문장만 배달하니 아래 문장 안에 있다. 다만 「driver 단명」 원칙과는 어긋난다: 시계가
+worker 세션 안에 살아서 tick 마다 맥락이 쌓인다(omp 가 반대한 그 drift). 첫 밤 pilot 한정이고, 아침에
+tick log 로 drift 를 재서 밖의 시계(entwurf doorbell CLI)로 옮길지 정한다. 시계를 달 때 허용되는 전부는 이것이다:
 
 > **새 코드는 시각에 고정 tick 문장을 살아 있는 sorge worker 에게 배달하고 종료할 수 있을 뿐이다.
 > `TRIAGE.md` 를 해석해 다음 행동을 고르거나 상태·재시도·회수를 소유하는 순간 그것은 루프 엔진이므로

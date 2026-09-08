@@ -5,8 +5,8 @@
 `sorge` holds what no single repository can hold for itself: **the view across all
 of them, and the memory of what was already decided.**
 
-Today that is mostly documents — a ledger, a contract, a caretaker's note. What it
-grows into is open. Care turns out to be many things: a note kept current, an issue
+Today that is mostly documents — a ledger, a contract, a loop agreement, an issue
+register, a caretaker's note. What it grows into is open. Care turns out to be many things: a note kept current, an issue
 triaged, a sibling's bug fixed, a template handed over at the right moment. The
 shape is expected to grow into the name rather than the other way round.
 
@@ -26,6 +26,14 @@ out. Until now there was nowhere for it to land: it got spoken into one
 conversation with one caretaker, and the other fifty never heard it.
 
 `sorge` is that landing place, and the hand that fans it back out.
+
+The operator's own writing on this sits in the garden and **is kept current**, so read
+it there rather than trusting any summary here:
+[**힣의 루프 — calling not my agent, but a being that knows
+me**](https://notes.junghanacs.com/notes/20240704T161707). It places this house in the
+middle of three layers — **tool (bot workshop) → place (`sorge`) → being** — and closes
+on the line that sets the direction: *"Help me survive. Read my writing and my life, and
+choose for yourself."*
 
 ## The name is the specification
 
@@ -86,13 +94,20 @@ re-derived on every pass, never written down. A stored copy of a derivable fact 
 a marker, and a marker has to be maintained; that proposal was made here once and
 refused for exactly that reason.
 
-So the ledger holds only what no command can answer: *a decision.* Which is why a
-pass that never runs cannot make it stale.
+So the ledger holds only what no command can answer: *a decision.* It therefore ages
+only when a judgement is made — and judgements arrive by more roads than the pass:
+the issue loop, a hand-off to another house, or plain conversation. What it is immune
+to is derivation: no command's output can make it stale.
 
 ## Scope
 
-The operator's **open-source** repositories (`~/repos/gh`). Company work has its
-own private chief-of-staff and is not this house's concern.
+**Only the repositories entered in the ledger**, and that list grows only when the
+operator asks. `~/repos/gh` is where a target can *live*, not the definition of one —
+conflating the two makes the pass widen itself, which is the same mistake as installing
+where nobody asked. A repo with no ledger row is not unjudged; it is out of scope, and
+the pass neither counts it nor raises it.
+
+Company work has its own private chief-of-staff and is not this house's concern.
 
 Part of the Heidegger axis: [`entwurf`](https://github.com/junghan0611/entwurf)
 (projection) · [`geworfen`](https://github.com/junghan0611/geworfen) (thrownness) ·
