@@ -13,6 +13,12 @@
 #
 # 값이 따옴표째 저장돼 있어 `replace(x,'"','')` 가 필요하다. 그건 이 DB 의 사실이지
 # 우리가 고칠 자리가 아니다.
+#
+# 제외 리스트 — Magit Forge 엔 있으나 이 판의 대상이 아닌 리포.
+# doomemacs-config 가 무엇을 추적할지 정하고, 여기서는 그중 무엇을 이 렌즈에
+# 비출지만 정한다(DB 자체를 건드리지 않는다).
+#   tuyahome: GLG 요청으로 제외 (2026-09-09) — 이 판의 「크로스 이슈 매니징」
+#             대상이 아닌 개인 리포
 title: sorge — 이슈판 (Magit Forge 캐시 · GitHub)
 description_html: |-
   <p>Magit Forge 의 로컬 캐시를 <b>읽기 전용</b>으로 본다. 원본은 GitHub 이고,
@@ -38,6 +44,16 @@ description_html: |-
   그대로 group by 하면 사람이 못 읽는다. <code>join repository on repository.id</code> 를 걸어라.
   아래 저장된 쿼리 넷은 둘 다 이미 하고 있다.</p>
 
+  <p><b>본문·댓글도 전부 로컬에 있다.</b> <code>issue.body</code> 가 이슈 본문,
+  <code>issue_post</code> 가 댓글 하나하나(작성자·시각·본문)를 갖는다 —
+  GitHub 을 다시 안 불러도 이 DB 하나로 스레드 전체를 읽을 수 있다. 그런데
+  아래 <code>board</code>/<code>stale_open</code>/<code>cross_repo</code> 는
+  canned query(직접 쓴 SQL)라, datasette 가 raw table 볼 때처럼 행마다
+  자동으로 상세 페이지 링크를 만들어주지 않는다 — PK 로 행을 아는 건 테이블
+  자체를 볼 때뿐이고, 임의 SQL 결과에는 그 정보가 없기 때문이다. 그래서
+  <code>detail</code> 컬럼을 직접 만들어 <code>issue_detail</code> 로 보낸다
+  (아래, GitHub 안 나가고 이 DB 만으로 본문+댓글 전부).</p>
+
 databases:
   forge-database:
     queries:
@@ -48,11 +64,14 @@ databases:
           with r as (
             select replace(name,'"','') n from repository
             where replace(owner,'"','') = 'junghan0611'
+              and replace(name,'"','') not in ('tuyahome')
           )
           select
             replace(rr.name,'"','')  as repo,
             i.number                 as "#",
             replace(i.title,'"','')  as title,
+            'http://127.0.0.1:8071/forge-database/issue_detail?repo='||replace(rr.name,'"','')||'&number='||i.number as detail,
+            'https://github.com/'||replace(rr.owner,'"','')||'/'||replace(rr.name,'"','')||'/issues/'||i.number as url,
             group_concat(distinct r.n) as mentions,
             count(distinct r.n)      as n,
             substr(replace(i.updated,'"',''),1,10) as updated
@@ -61,6 +80,7 @@ databases:
           join r on r.n <> replace(rr.name,'"','')
                and (i.body like '%'||r.n||'%' or i.title like '%'||r.n||'%')
           where i.state = 'open'
+            and replace(rr.name,'"','') not in ('tuyahome')
           group by i.id
           order by n desc, updated desc
 
@@ -71,9 +91,12 @@ databases:
             replace(r.name,'"','')   as repo,
             i.number                 as "#",
             replace(i.title,'"','')  as title,
+            'http://127.0.0.1:8071/forge-database/issue_detail?repo='||replace(r.name,'"','')||'&number='||i.number as detail,
+            'https://github.com/'||replace(r.owner,'"','')||'/'||replace(r.name,'"','')||'/issues/'||i.number as url,
             substr(replace(i.updated,'"',''),1,10) as updated
           from issue i join repository r on i.repository = r.id
           where i.state = 'open'
+            and replace(r.name,'"','') not in ('tuyahome')
           order by repo, i.number
 
       by_repo:
@@ -85,6 +108,7 @@ databases:
             count(*)               as total,
             substr(max(replace(i.updated,'"','')),1,10) as last_touch
           from issue i join repository r on i.repository = r.id
+          where replace(r.name,'"','') not in ('tuyahome')
           group by repo order by open desc, total desc
 
       stale_open:
@@ -95,8 +119,40 @@ databases:
             replace(r.name,'"','')   as repo,
             i.number                 as "#",
             replace(i.title,'"','')  as title,
+            'http://127.0.0.1:8071/forge-database/issue_detail?repo='||replace(r.name,'"','')||'&number='||i.number as detail,
+            'https://github.com/'||replace(r.owner,'"','')||'/'||replace(r.name,'"','')||'/issues/'||i.number as url,
             substr(replace(i.updated,'"',''),1,10) as updated,
             cast(julianday('now') - julianday(substr(replace(i.updated,'"',''),1,10)) as int) as days
           from issue i join repository r on i.repository = r.id
           where i.state = 'open'
+            and replace(r.name,'"','') not in ('tuyahome')
           order by days desc
+
+      issue_detail:
+        title: 이슈 상세 — 본문 + 댓글 전부 (이 DB 만으로, GitHub 안 나감)
+        description: |-
+          위 세 판의 `detail` 링크가 여기로 온다. `?repo=sorge&number=14` 처럼 직접
+          채워도 된다. `union all` 이라 첫 행이 이슈 본문, 그다음이 댓글들이다 —
+          `kind` 로 가른다.
+        sql: |-
+          select
+            substr(replace(i.updated,'"',''),1,16) as updated,
+            'issue'                                 as kind,
+            replace(i.author,'"','')                as author,
+            replace(i.title,'"','')                 as title,
+            replace(i.body,'"','')                  as text
+          from issue i
+          join repository r on i.repository = r.id
+          where replace(r.name,'"','') = :repo and i.number = cast(:number as integer)
+          union all
+          select
+            substr(replace(p.updated,'"',''),1,16)  as updated,
+            'comment'                                as kind,
+            replace(p.author,'"','')                 as author,
+            null                                     as title,
+            replace(p.body,'"','')                   as text
+          from issue_post p
+          join issue i on p.issue = i.id
+          join repository r on i.repository = r.id
+          where replace(r.name,'"','') = :repo and i.number = cast(:number as integer)
+          order by updated
