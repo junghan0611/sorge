@@ -19,6 +19,8 @@ error()   { echo -e "${RED}✗${NC} $1"; }
 
 SORGE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SWEEP="$SORGE_DIR/.claude/skills/sorge/scripts/sweep.py"
+BOARD="$SORGE_DIR/.claude/skills/sorge/scripts/board.py"
+LABELS="$SORGE_DIR/.claude/skills/sorge/scripts/labels.py"
 METADATA="$SORGE_DIR/datasette/metadata.yml"
 BOARD_PORT="${SORGE_BOARD_PORT:-8071}"
 
@@ -35,6 +37,10 @@ need() {
 # ── 순회 ────────────────────────────────────────────────
 
 sweep_board() { python3 "$SWEEP" "$@"; }
+
+# 이슈판 — 라이브. 저장하지 않는다. 상태는 이슈 라벨에 산다.
+board_show()  { python3 "$BOARD" "$@"; }
+board_label() { python3 "$LABELS" "$@"; }
 
 sweep_brief() {
     local repo="${1:-}"
@@ -132,13 +138,14 @@ show_menu() {
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo ""
     echo -e "  ${YELLOW}순회${NC}"
+    echo "    i) 이슈판 (라이브 · 라벨 기준)"
     echo "    1) 판 세우기 (sweep — 빚·문서 미정·대상 밖)"
     echo "    2) 브리핑 전부 (형제에게 그대로 던질 블록)"
     echo "    3) 한 리포만 브리핑 (대상 밖도 답한다)"
     echo "    4) 빚 기준 바꿔 보기 (기본 15커밋)"
     echo ""
     echo -e "  ${YELLOW}이슈판 (Magit Forge 캐시 · GitHub)${NC}"
-    echo "    b) 띄우기      → http://127.0.0.1:$BOARD_PORT"
+    echo "    b) datasette 렌즈 → http://127.0.0.1:$BOARD_PORT"
     echo "    s) 상태"
     echo "    q) 내리기"
     echo "    a) DB 나이·규모"
@@ -161,9 +168,11 @@ sorge — 돌봄의 순회
   ./run.sh                 메뉴
   ./run.sh sweep [인자…]   순회. 인자는 sweep.py 로 그대로 간다
   ./run.sh brief [리포]    브리핑 블록
-  ./run.sh board           이슈판 띄우기
-  ./run.sh board-stop      내리기
-  ./run.sh board-status    상태
+  ./run.sh board [인자…]   이슈판 — 라이브 표 (gh + 대장 join). --debt --house R --all --json
+  ./run.sh label …         표준 라벨 (--ensure --migrate, 기본 dry-run, 쓰려면 --go)
+  ./run.sh lens            datasette 렌즈 띄우기 (Magit Forge 캐시 · 읽기 전용)
+  ./run.sh lens-stop       내리기
+  ./run.sh lens-status     상태
   ./run.sh age             DB 나이·규모
   ./run.sh pull [force]    forge-pull (정책은 doomemacs-config 소유)
 
@@ -176,9 +185,11 @@ main() {
         case "$1" in
             sweep)        shift; sweep_board "$@" ;;
             brief)        shift; sweep_brief "${1:-}" ;;
-            board)        board_start ;;
-            board-stop)   board_stop ;;
-            board-status) board_status ;;
+            board)        shift; board_show "$@" ;;
+            label)        shift; board_label "$@" ;;
+            lens)         board_start ;;
+            lens-stop)    board_stop ;;
+            lens-status)  board_status ;;
             age)          board_age ;;
             pull)         shift; board_pull "${1:-}" ;;
             -h|--help|help) usage ;;
@@ -196,6 +207,7 @@ main() {
             2) sweep_brief ;;
             3) read -rp "리포 이름: " r; [[ -n "$r" ]] && sweep_brief "$r" ;;
             4) read -rp "빚 기준 커밋 수: " d; [[ -n "$d" ]] && sweep_board --debt "$d" ;;
+            i) board_show ;;
             b) board_start ;;
             s) board_status || true ;;
             q) board_stop ;;

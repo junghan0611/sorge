@@ -1,6 +1,6 @@
 ---
 name: sorge
-description: "돌봄 — 대장에 오른 GLG의 리포를 가로질러 보고, 그 담당자에게 그의 몫을 돌려준다. 대상 목록은 GLG가 요청할 때만 늘어난다. 담당자 문서가 낡았는지, 자기수선 스킬이 필요한지, 비슷한 flake/run.sh 선례가 어디 있는지(Clojure는 JVM이 아니라 GraalVM native-image), 한 곳에서 얻은 발견이 어느 리포들에 걸리는지. 대신 해주지 않고 브리핑까지 한다. 트리거: 'sorge', '소르게', '돌봄', '순회', '리포 감수', '담당자 문서', '여기 담당자 누구지', '노트 업뎃해', '수선 스킬', '비슷한 flake 있나', '선례 찾아'."
+description: "돌봄 — 대장에 오른 GLG의 리포를 가로질러 보고, 그 담당자에게 그의 몫을 돌려준다. 대상 목록은 GLG가 요청할 때만 늘어난다. 담당자 문서가 낡았는지, 자기수선 스킬이 필요한지, 비슷한 flake/run.sh 선례가 어디 있는지(Clojure는 JVM이 아니라 GraalVM native-image), 한 곳에서 얻은 발견이 어느 리포들에 걸리는지. 대신 해주지 않고 브리핑까지 한다. 트리거: 'sorge', '소르게', '돌봄', '순회', '리포 감수', '담당자 문서', '여기 담당자 누구지', '노트 업뎃해', '수선 스킬', '비슷한 flake 있나', '선례 찾아', '내 몫', '내가 할 일', '판보기', '이슈판', 'board', '내 몫 뭐야', '지금 뭐가 열려있지'."
 user_invocable: true
 ---
 
@@ -16,6 +16,9 @@ user_invocable: true
 | 형제에게 건넬 블록 | `… /sweep.py --brief` | 리포별 블록을 **그대로** `entwurf_v2`로 던진다. 요약하지 않는다 |
 | 한 리포만 | `… /sweep.py --repo <name> --brief` | **지명받으면 어느 갈래든 답한다** — 대상 밖이든 빚 0이든. 이름을 대고 물었는데 침묵하는 것은 답이 아니다. 맨 순회가 스스로 올리는 것과는 다르다 |
 | 빚 기준 조정 | `… /sweep.py --debt 30` | 기본 15커밋 |
+| **내 몫 — 「판보기 버튼」** | `python3 ~/repos/gh/sorge/.claude/skills/sorge/scripts/board.py --mine` | 인자 없이 부르면 **cwd 의 git remote 로 자기 집을 유추**한다. 확정(라벨/리포)과 후보(남의 집 이슈가 내 리포 이름을 부른 것)를 **갈라서** 낸다 — 후보는 판정이 아니라 제안이므로 담당자가 가른다 |
+| 전체 이슈판 | `… /board.py` · `--debt` · `--house <repo>` · `--all` · `--json` | 대장 join 된 라이브 표. 상태는 **이슈 라벨**에 살고 저장하는 것이 없다. `TRIAGE.md` 는 은퇴했다 |
+| 표준 라벨 | `… /labels.py --ensure` (기본 dry-run, 쓰려면 `--go`) | `house:` · `state:` · `ball:` 세 축. `state`/`ball` 은 **`label-set` 단일값**이라 재실행이 안전하다 |
 | 기술스택 선례 | `grep -rl "native-image\|graalvm" ~/repos/gh/*/{run.sh,*.nix,*.edn} 2>/dev/null` | 선례 리포를 이름으로 건네고, 그 담당자가 읽게 한다 |
 
 판정을 적는 곳은 `~/repos/gh/sorge/LEDGER.md` 하나다. **sweep은 아무것도 쓰지 않는다.**
