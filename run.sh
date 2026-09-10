@@ -86,7 +86,6 @@ board_start() {
     if curl -sf -m 5 -o /dev/null "http://127.0.0.1:$BOARD_PORT/"; then
         success "이슈판 → http://127.0.0.1:$BOARD_PORT"
         echo ""
-        echo "  횡단 이슈   /forge-database/cross_repo   ← 다른 리포를 부르는 open 이슈"
         echo "  열린 판     /forge-database/board"
         echo "  리포별      /forge-database/by_repo"
         echo "  오래된 것   /forge-database/stale_open"
@@ -168,7 +167,7 @@ sorge — 돌봄의 순회
   ./run.sh                 메뉴
   ./run.sh sweep [인자…]   순회. 인자는 sweep.py 로 그대로 간다
   ./run.sh brief [리포]    브리핑 블록
-  ./run.sh board [인자…]   이슈판 — 라이브 표 (gh + 대장 join). --debt --house R --all --json
+  ./run.sh board [인자…]   이슈판 — 라이브 표 (gh + 대장 join). --debt --house R --mine [R] --all --json
   ./run.sh label --set 'R#N=ready,owner' --go   생애 전이 (label-set 단일값)
   ./run.sh label --house 'R#N=house' --go        몫 판정 굳히기
   ./run.sh label --ensure                        라벨 정의 (기본 dry-run)

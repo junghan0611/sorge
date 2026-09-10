@@ -52,7 +52,11 @@ writes nothing there and comments on nobody's issue.
 derivable, and deriving it is strictly better than storing it: a stored path can
 agree with a worktree that was removed, which is precisely how LOOP's second gate
 could read green against a directory that no longer existed. `board.py` derives
-it and flags any `state:running|review|proposed` with no worktree on disk.
+it and flags any `state:running|review` with no worktree on disk. `proposed`
+is NOT in that set: it means "awaiting GLG's decision", which happens in no
+place, so demanding a directory of it accused six issues of a mistake that
+was the vocabulary's (fixed in `board.py` by `ad500ee`; this sentence was
+written 22 minutes earlier by `2d2fca2` and did not follow).
 
 THE CONTRACT THIS TOUCHES
 -------------------------
@@ -71,8 +75,14 @@ import re
 import subprocess
 import sys
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-SORGE = os.path.abspath(os.path.join(HERE, "..", "..", "..", ".."))
+# The skill is reached through symlinks -- six harness surfaces plus agent-config
+# all point here, and `abspath` does not resolve them, so `..`x4 walked out of a
+# stranger's directory and the ledger silently vanished. Measured 2026-09-10:
+# abspath landed correctly from 1 of 8 call paths, realpath from 8 of 8.
+# realpath resolves the link FIRST, so the root is the real repo no matter which
+# door the caller came through.
+HERE = os.path.dirname(os.path.realpath(__file__))
+SORGE = os.path.realpath(os.path.join(HERE, "..", "..", "..", ".."))
 LEDGER = os.path.join(SORGE, "LEDGER.md")
 TRIAGE = os.path.join(SORGE, "TRIAGE.md")
 OWNER = "junghan0611"
@@ -139,14 +149,15 @@ def ledger_houses():
 def ensure(houses, dry):
     """Create the label definitions. Idempotent; never deletes.
 
-    `house:` labels go only into COORD_HOUSES. Elsewhere the repo name already IS
-    the house, so shipping thirteen redundant labels into every repo would be
-    exactly the "묻지 않은 곳에 설치하는 것" this house forbids.
+    `--ensure` pre-seeds `house:` labels only into COORD_HOUSES. Other repos get
+    one only through `ensure_house()` when an actual cross-house judgment needs
+    it; the issue's own repo never needs its own `house:` label.
     """
     for repo in houses:
         want = list(STATES) + list(BALLS)
         if repo in COORD_HOUSES:
-            want += [(f"house:{h}", HOUSE_COLOR, f"{h} 의 몫") for h in houses]
+            want += [(f"house:{h}", HOUSE_COLOR, f"{h} 의 몫")
+                     for h in houses if h != repo]
         have = set()
         r = sh(f"gh label list -R {OWNER}/{repo} --limit 100 --json name -q '.[].name'")
         if r.returncode == 0:
@@ -183,23 +194,21 @@ def ensure_house(repo, house, dry):
 def assign(spec, dry):
     """`<repo>#<n>=<house>[,<house>]` — record that this issue's work is theirs.
 
-    This is the verb the candidate lane was missing. A caretaker reads a
-    candidate, decides it is (partly) their share, and that decision has to land
-    somewhere or the board will keep proposing it. It lands on the issue.
+    This is the verb for recording a cross-house judgment. sorge reads an
+    unclassified issue, decides it is (partly) another house's share, and that
+    decision has to land somewhere. It lands on the issue.
     """
     m = re.match(r"^([A-Za-z0-9._-]+)#(\d+)=(.+)$", spec)
     if not m:
         sys.exit(f"형식: <repo>#<번호>=<house>[,<house>]  받은 것: {spec}")
     repo, num, hs = m.group(1), m.group(2), [h.strip() for h in m.group(3).split(",")]
     known = ledger_houses()
-    # The issue's OWN repo must be named too, once any house: label exists.
-    # `classify()` reads `hs = labels or [repo]` -- the repo is a FALLBACK, so the
-    # first house: label silently switches it off. Labelling only the newcomer
-    # would therefore evict the owning house from its own issue, which is the
-    # opposite of what the judgment said. Add it back automatically rather than
-    # trusting every caller to remember an implementation detail.
-    if repo in known and repo not in hs:
-        hs.append(repo)
+    # classify() always keeps the issue repo as its own house. `house:` names
+    # only additional houses, as LOOP.md's label contract requires.
+    hs = [h for h in hs if h != repo]
+    if not hs:
+        sys.exit(f"{repo}#{num} 의 자기 집은 house: 라벨 없이 이미 포함된다. "
+                 "횡단 몫만 지정하라.")
     for h in hs:
         if h not in known:
             sys.exit(f"대장에 없는 집이다: {h}  (대장 밖은 대상이 아니다)")
@@ -319,6 +328,17 @@ def plan(houses, ref=None):
         elif sm and sm.group(1) in STATE_MAP:
             labels.append(STATE_MAP[sm.group(1)])
         if repo == "sorge":
+            # CROSS houses only -- never the filing repo. `LOOP.md:56` says a
+            # `house:` label goes on "이슈 리포 ≠ 일하는 집일 때만".
+            #
+            # Withdrawn here (2026-09-10): I had made this path ALSO write the
+            # owning repo, to match `assign()` and stop the filing house losing
+            # its own issue. That treated the symptom at the writer. The cause was
+            # in the reader -- `classify()` took the repo as a FALLBACK, so the
+            # first cross label evicted it. Cross-review moved the fix there: the
+            # reader now always keeps the own repo and `house:` only ADDS. Once it
+            # does, writing the own house is redundant AND against the contract,
+            # so both writers stop doing it and the 6 live issues need no backfill.
             labels += [f"house:{h}" for h in hs]
         if labels:
             rows.append((repo, num, sorted(set(labels))))
@@ -366,7 +386,7 @@ def main():
     ap.add_argument("--from-ref", metavar="REF",
                     help="TRIAGE.md 를 이 커밋에서 읽는다 (포인터로 바뀐 뒤의 재실행)")
     ap.add_argument("--house", metavar="SPEC", action="append", default=[],
-                    help="후보 판정을 굳힌다: <repo>#<번호>=<house>[,<house>]. "
+                    help="횡단 몫 판정을 굳힌다: <repo>#<번호>=<house>[,<house>]. "
                          "라벨이 없으면 그 리포에 신설한다. 여러 번 줄 수 있다")
     ap.add_argument("--set", metavar="SPEC", action="append", default=[],
                     help="생애 전이: <repo>#<번호>=<state>[,<ball>]. "

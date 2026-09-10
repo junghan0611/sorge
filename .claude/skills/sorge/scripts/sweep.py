@@ -33,7 +33,7 @@ REPOS = os.path.join(HOME, "repos", "gh")
 def _find_ledger():
     """Walk up to the repo root. A wrong path here would silently report every
     settled judgment as an open question -- the one failure this tool must not have."""
-    d = os.path.dirname(os.path.abspath(__file__))
+    d = os.path.dirname(os.path.realpath(__file__))
     for _ in range(6):
         cand = os.path.join(d, "LEDGER.md")
         if os.path.isfile(cand):
@@ -145,9 +145,13 @@ def load_ledger():
     """
     judged = {}
     if not LEDGER:
-        print("warn: LEDGER.md not found -- every judgment will read as open",
-              file=sys.stderr)
-        return judged
+        # This used to warn on stderr and carry on. The table then printed
+        # `빚 (0) · 조용함 (0)` and exited 0 -- so anyone reading stdout (an agent
+        # piping it, a --brief consumer) saw a clean sweep. The docstring on
+        # _find_ledger already named this as "the one failure this tool must not
+        # have"; warning about it on a different stream is not not-having it.
+        sys.exit("LEDGER.md 를 못 찾았다 — 판정 없이 도는 순회는 모든 것을 "
+                 "「조용함」 으로 보고한다. sorge 리포 안에서 해석돼야 한다.")
     row = re.compile(r"^\|\s*([A-Za-z0-9._-]+)\s*\|\s*(배정|관리 안 함|보류|불필요)"
                      r"\s*\|\s*([^|]*)\|\s*([^|]*)\|\s*([^|]*)\|")
     for line in open(LEDGER, encoding="utf-8"):

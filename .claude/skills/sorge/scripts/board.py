@@ -43,9 +43,16 @@ import os
 import re
 import subprocess
 import sys
+import urllib.parse
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-SORGE = os.path.abspath(os.path.join(HERE, "..", "..", "..", ".."))
+# The skill is reached through symlinks -- six harness surfaces plus agent-config
+# all point here, and `abspath` does not resolve them, so `..`x4 walked out of a
+# stranger's directory and the ledger silently vanished. Measured 2026-09-10:
+# abspath landed correctly from 1 of 8 call paths, realpath from 8 of 8.
+# realpath resolves the link FIRST, so the root is the real repo no matter which
+# door the caller came through.
+HERE = os.path.dirname(os.path.realpath(__file__))
+SORGE = os.path.realpath(os.path.join(HERE, "..", "..", "..", ".."))
 LEDGER = os.path.join(SORGE, "LEDGER.md")
 
 OWNER = "junghan0611"
@@ -127,8 +134,16 @@ def ledger_houses():
     counted, listed or asked about (AGENTS.md § 대상). That is why the debt
     number in this board can never grow just because GLG opened a new repo.
     """
+    # An unreadable ledger must NEVER render as an empty one. The docstring above
+    # says an absent repo is out of scope -- so a missing FILE would put the whole
+    # universe out of scope and print `미분류 0`, i.e. "you owe nothing". That is
+    # the same failure `ad500ee` fixed on the issue axis (nobody-looked and
+    # somebody-is-on-it rendering alike): the wrong answer is the reassuring one.
+    # Loud and empty-handed beats quiet and confidently wrong.
     if not os.path.exists(LEDGER):
-        return {}
+        sys.exit(f"LEDGER.md 를 못 읽었다: {LEDGER}\n"
+                 f"  대장 없이는 「대상」을 가를 수 없고, 빈 대장은 「빚 0」 으로 보인다.\n"
+                 f"  이 스크립트는 sorge 리포 안에서 해석돼야 한다 (지금 뿌리: {SORGE}).")
     out = {}
     for line in open(LEDGER, encoding="utf-8"):
         m = re.match(r"^\|\s*([a-zA-Z0-9._-]+)\s*\|\s*(배정|관리 안 함)\s*\|", line)
@@ -145,21 +160,22 @@ query($q: String!, $after: String) {
       number title url updatedAt
       repository { name }
       labels(first: 30) { nodes { name } }
-      BODY
     } }
   }
 }
 """
 
 
-def fetch(query, body=False):
-    """Ask for bodyText only when a caller must match against it.
+def fetch(query):
+    """No issue BODY is ever requested, and that is now structural.
 
-    The candidate lane needs the body to apply word boundaries; the board does
-    not, and pulling 86 bodies to render a table nobody reads them in would be
-    payload for nothing.
+    This used to take `body=True` for the one caller that matched the repo name
+    against issue text. GLG retired that axis on 2026-09-10 ("라벨에 리포이름을
+    넣자고했는데 텍스트로 검색하면 안된다"), so nothing here reads a body, and the
+    option is gone rather than left idle: a switch with no caller is the next
+    person's invitation to search text again.
     """
-    gql = GQL.replace("BODY", "bodyText" if body else "")
+    gql = GQL
     nodes, after = [], None
     while True:
         cmd = ["gh", "api", "graphql", "-f", f"query={gql}", "-F", f"q={query}"]
@@ -179,14 +195,16 @@ def fetch(query, body=False):
 def classify(node, houses):
     """Turn one issue's labels into the three axes, then join with the ledger.
 
-    An issue with no `house:` label falls back to its own repo -- in `entwurf`
-    the house is obviously entwurf, so labelling it there would be noise. The
-    label earns its place only where the two differ, which in practice means
-    coordination issues filed in `sorge` about somebody else's lane.
+    The issue's own repo is always one house -- in `entwurf` the house is
+    obviously entwurf, so a `house:entwurf` label would be noise. `house:` adds
+    only the OTHER houses an issue crosses into. Keeping the own repo after the
+    first cross-house label is essential: labels augment the issue's home; they
+    do not replace it.
     """
     repo = node["repository"]["name"]
     labels = [l["name"] for l in node["labels"]["nodes"]]
-    hs = [l[len(NS_HOUSE):] for l in labels if l.startswith(NS_HOUSE)] or [repo]
+    labelled = [l[len(NS_HOUSE):] for l in labels if l.startswith(NS_HOUSE)]
+    hs = list(dict.fromkeys([repo] + labelled))
     # Both axes are contracted single-valued. Read them as LISTS anyway: a second
     # value is a real state of the world (two agents raced, or a `--set` was half
     # applied), and picking the API's first element would hide it behind a value
@@ -211,6 +229,11 @@ def classify(node, houses):
         "url": node["url"],
         "updated": node["updatedAt"][:10],
         "houses": hs,
+        # Houses that a `house:` LABEL actually names, without the own-repo seat
+        # the reader adds. `--mine` needs the difference: a gh label filter can
+        # only see what is written, so quoting `houses` at the caller would
+        # promise a number the filter does not return.
+        "labelled_houses": labelled,
         "state": state,
         "ball": ball,
         "target": target,
@@ -221,7 +244,6 @@ def classify(node, houses):
         "wt": wt_ok,
         "receipt": receipt,
         "ambiguous": "ambiguous" in (state, ball),
-        "body": node.get("bodyText", ""),
         "other": [l for l in labels
                   if not l.startswith((NS_HOUSE, NS_STATE, NS_BALL))],
     }
@@ -251,34 +273,91 @@ def mine(repo, houses):
     finding arrives across the system and leaves across it too, so the issue that
     names your repo is very often not filed in it.
 
-    Two layers, and they are not the same kind of claim:
+    ONE layer, and it is a judgment: a `house:<repo>` label, or the issue lives
+    in that repo. Someone READ it and said so.
 
-      확정  a `house:<repo>` label, or the issue simply lives in that repo.
-            Someone judged it. This is the share.
-      후보  the repo's NAME appears in some other house's open issue. Nobody
-            judged anything; full-text search proposed it.
+    There used to be a second lane -- 후보 -- where the repo's NAME appearing in
+    some other house's open issue proposed a link. GLG retired the text axis on
+    2026-09-10: *"내가 라벨에 리포이름을 넣자고했는데 텍스트로 검색하면 안된다."*
+    The label WAS the instruction; the text lane was the older mechanism left
+    standing beside it.
 
-    Keeping them apart is the ledger rule applied one level down -- "서치는
-    제안하고, 대장이 결정한다". Collapsing them would turn a grep hit into an
-    assignment, which is how a caretaker ends up owning work nobody gave them.
+    It cannot be repaired, and the failures are not a tuning problem -- a repo
+    name is an identifier we borrowed from ordinary words, and in a body it is
+    just a word again. Measured 2026-09-10, with word boundaries already enforced:
+
+      apply         `(apply fn args)` in elisp · `lens.apply` · the path
+                    `apply/ax/ax.org`  -- an English verb and a function name
+      junghan0611   `github.com/junghan0611/garden` -- it is the OWNER, so it is
+                    inside every URL in every issue. Structurally 100% false
+      garden        11 hits, 3 real -- a common word in GLG's own vocabulary
+      org-20250624  the real repo name nobody writes; `org` finds nothing
+
+    Three fixes were tried in one day and each uncovered the next: boundaries
+    (`edgeagent-config`) -> vocabulary (`garden`) -> suffix (`org-20250624`).
+    Across 13 houses the lane proposed 50 links.
+
+    WHAT REPLACES THE DISCOVERY, because removing it must not remove the reason
+    this house exists (AGENTS.md § 이 집이 있는 이유 -- a finding arrives across
+    the system and leaves across it too, so the issue naming your repo is often
+    not filed in it):
+
+      발견   the BOARD's 미분류 lane -- what this code counts as debt.
+      판정   `--house <repo>#<n>=<house>` writes what the reading found.
+      몫     그 담당자가 여기서 확정으로 받는다.
+
+    CAUTION, and this comment must not settle it: `LOOP.md:61` states the rule as
+    「라벨 없음 = 미분류」 while `board.py` computes `state is None`. Those differ
+    for an issue that carries a `house:` judgment and no lifecycle state -- today
+    exactly one, `sorge#12` (measured 2026-09-10, cross-review by terra). A repo
+    judgment IS a judgment, so under the written rule that issue is triaged and
+    under the code it is debt. Which one is the 정본 is GLG's, not this comment's:
+    a comment that resolves a contract it merely observes is the fault this house
+    was warned about by its own reviewer.
+
+    Measured the same day: 10 cross-filed issues carry a `house:` label naming a
+    repo other than the one they live in, and ALL 10 arrive here through 확정.
+    The chain is built and loaded; the text lane was a grep impersonating the
+     순회. It was an impersonation, so it lived on the luck of a word.
     """
     owned = [r for r in (classify(n, houses) for n in
                          fetch(f"owner:{OWNER} is:issue is:open"))
              if repo in r["houses"]]
-    hits = fetch(f'owner:{OWNER} is:issue is:open "{repo}" in:title,body', body=True)
-    seen = {(r["repo"], r["number"]) for r in owned}
-    # GitHub full-text matches substrings, so `agent-config` also hits
-    # `edgeagent-config` -- measured as a live false positive by the agent-config
-    # caretaker (2026-09-10), 1 of 9 candidates, an issue about an a2a SDK survey
-    # with nothing to do with that house. A repo name is a word, so require word
-    # boundaries. Only the CANDIDATE lane needs this; the 확정 lane is label- and
-    # repo-based and cannot pick up a substring.
-    word = re.compile(rf"(?<![\w-]){re.escape(repo)}(?![\w-])")
-    cand = [c for c in (classify(n, houses) for n in hits)
-            if (c["repo"], c["number"]) not in seen and repo not in c["houses"]
-            and word.search(c["title"] + " " + (c.get("body") or ""))]
-
     print(f"━━ {repo} 의 몫 ━━\n")
+    # THIRD instance of today's form, and the worst-worded of the three.
+    # `board.py:130` could not tell "대장에 없다" from "대장을 못 읽었다"; `sweep.py`
+    # warned on a stream nobody read. Here a repo that is OUT OF SCOPE rendered
+    # identically to a target house with nothing to do -- down to the closing
+    # line "「없음」은 결함이 아니다", which does not merely stay silent but
+    # actively reassures. A caretaker whose house GLG never registered was told
+    # they were all caught up.
+    #
+    # It was also what made the retired 후보 lane look loudest exactly here: that
+    # lane subtracted 확정, and an out-of-scope house has no 확정 to subtract, so
+    # every full-text hit survived (garden: 11 proposed, 3 real). The noise and
+    # the silence were ONE fault, which is why saying 밖 was half of its cure and
+    # GLG retiring the text axis was the other half.
+    #
+    # The dirname is printed because it is DERIVED, not stored. GLG named the
+    # real shape -- a house's human name need not be its repo name (`~/org` is
+    # `org-20250624`, `~/repos/gh/notes` is `garden`). No alias column: a stored
+    # alias is a marker, and this house refuses markers (`.diskclean-owned`,
+    # 2026-08-10). Showing both names lets the caller pick the registered one.
+    if repo not in houses:
+        # Only when we are actually SITTING in that repo does the directory name
+        # say anything. With an explicit `--mine <name>` the cwd is unrelated, and
+        # printing its basename there invents a divergence that does not exist.
+        cwd_name = os.path.basename(os.path.realpath(os.getcwd()))
+        alias = (f" · 디렉터리 이름은 「{cwd_name}」"
+                 if here() == repo and cwd_name != repo else "")
+        print(f"⚠ 이 집은 대장에 없다 — 대상 밖이라 「확정」을 계산하지 않는다.")
+        print(f"   remote 가 말하는 이름은 「{repo}」{alias}.")
+        print(f"   대장에 다른 이름으로 올라 있으면 그 이름으로 불러라: --mine <이름>")
+        # "판정 대기다" told the caretaker to wait and named no hand. This house's
+        # own rule is to show the next move instead of the prohibition, and this
+        # was the one line missing it (agent-config caretaker, user-seat review).
+        print(f"   대상이 맞다고 보면 GLG 에게 대장 편입을 요청해라 — "
+              f"대상은 GLG 가 요청할 때만 넓어진다.\n")
     if owned:
         print(f"확정 {len(owned)} — 라벨이 붙었거나 이 집 이슈다")
         for r in sorted(owned, key=lambda r: (r["state"] or "~", r["number"])):
@@ -286,14 +365,47 @@ def mine(repo, houses):
             ball = BALL_MARK.get(r["ball"], "—")
             print(f"    {mark:<8} 공={ball:<4} {r['repo']}#{r['number']:<4} {r['title'][:58]}")
         print()
-    if cand:
-        print(f"후보 {len(cand)} — 남의 집 이슈가 「{repo}」 를 이름으로 부른다.")
-        print(f"     판정이 아니다. 읽고 「내 몫이다/아니다」를 네가 정한다.")
-        for c in sorted(cand, key=lambda c: c["updated"]):
-            print(f"    {c['repo']}#{c['number']:<4} {c['updated']}  {c['title'][:58]}")
+    if not owned:
+        # Only a TARGET house may be told its emptiness is fine. Saying it to an
+        # unregistered house is the reassurance the block above just warned about.
+        if repo in houses:
+            print("확정된 몫이 없다. 「없음」은 결함이 아니다.\n")
+        else:
+            print("확정이 없다. 「없음」이 아니라 「밖」이다 — 위 줄을 읽어라.\n")
+    # Name where the UNJUDGED cross-house work lives, so that retiring the text
+    # lane reads as a relocation and not as a loss. A caretaker must not conclude
+    # from a short 확정 list that nothing out there concerns them -- that would be
+    # today's silence fault a fourth time, one layer out.
+    if repo in houses:
+        # GLG's own description of the workflow this label axis exists for
+        # (2026-09-10): "내가 apply 담당자면, 라벨 필터를 apply로 내놓고 뒤져보면,
+        # A 리포에 apply 라벨이슈가 있으면 내것이구나 하면서 들여다 볼 수 있거든.
+        # 즉, 내 판이 아니어도 내가 관심 가지고 보는거야."
+        #
+        # The lane above combines this filter with unlabeled issues in the
+        # caretaker's own repo. This hands over the filter itself, because
+        # 뒤져보다 is not the same act as 조회하다 -- one is a table somebody
+        # rendered, the other is you moving around in it. A caretaker who can
+        # only ask through this script cannot browse; a URL and a gh line let
+        # them look without us, and let them show GLG what they saw.
+        ql = urllib.parse.quote_plus(f'owner:{OWNER} is:issue is:open label:"house:{repo}"')
+        # Say the number the filter returns, not just the filter. The lane above
+        # counts 확정, which includes this house's OWN issues -- and those carry no
+        # `house:` label at all (`LOOP.md:56`: 붙이는 것은 이슈 리포 ≠ 일하는 집일
+        # 때만). So a caretaker reading 확정 20 and then getting 7 from the filter
+        # meets a 13-issue gap that is contract, not loss. Today's whole commit is
+        # about two situations that render alike; this is the mirror -- ONE
+        # situation rendering as two numbers -- and it is closed the same way, by
+        # saying which is which (agent-config caretaker, user-seat review).
+        n_lab = len([r for r in owned if repo in r["labelled_houses"]])
+        print(f"이 이름표를 어느 리포에서든 하나로 뒤진다 — **남의 판에 있는 {n_lab}건**:")
+        print(f'     gh search issues --owner {OWNER} --state open --label "house:{repo}"')
+        print(f"     https://github.com/search?q={ql}&type=issues")
+        print(f"     (이 집 리포의 이슈는 라벨을 안 달므로 여기 안 나온다 — LOOP.md:56)")
         print()
-    if not owned and not cand:
-        print("아무것도 없다. 「없음」은 결함이 아니다.\n")
+        print("아직 판정 안 된 횡단 일은 위에 없다 — 판의 미분류 레인에 있고 sorge 가 읽는다:")
+        print("     ./run.sh board --debt        (판정 전)")
+        print("     ./run.sh label --house <repo>#<n>=<이 집>   (읽은 것을 적는다)")
 
 
 def render(rows, houses, show_out=False, total=None):
@@ -413,7 +525,7 @@ def main():
     ap.add_argument("--debt", action="store_true", help="미분류만")
     ap.add_argument("--house", help="한 집만")
     ap.add_argument("--mine", metavar="REPO", nargs="?", const="",
-                    help="그 집 담당자의 시야 — 확정된 몫 + 이름으로 불린 후보. "
+                    help="그 집 담당자의 시야 — 확정된 몫만. "
                          "인자를 빼면 cwd 의 git remote 에서 유추한다")
     ap.add_argument("--all", action="store_true", help="대상 밖도 보인다")
     ap.add_argument("--json", action="store_true")

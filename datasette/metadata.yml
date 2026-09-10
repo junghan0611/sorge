@@ -47,43 +47,16 @@ description_html: |-
   <p><b>본문·댓글도 전부 로컬에 있다.</b> <code>issue.body</code> 가 이슈 본문,
   <code>issue_post</code> 가 댓글 하나하나(작성자·시각·본문)를 갖는다 —
   GitHub 을 다시 안 불러도 이 DB 하나로 스레드 전체를 읽을 수 있다. 그런데
-  아래 <code>board</code>/<code>stale_open</code>/<code>cross_repo</code> 는
-  canned query(직접 쓴 SQL)라, datasette 가 raw table 볼 때처럼 행마다
-  자동으로 상세 페이지 링크를 만들어주지 않는다 — PK 로 행을 아는 건 테이블
-  자체를 볼 때뿐이고, 임의 SQL 결과에는 그 정보가 없기 때문이다. 그래서
-  <code>detail</code> 컬럼을 직접 만들어 <code>issue_detail</code> 로 보낸다
-  (아래, GitHub 안 나가고 이 DB 만으로 본문+댓글 전부).</p>
+  아래 <code>board</code>/<code>stale_open</code> 은 canned query(직접 쓴 SQL)라,
+  datasette 가 raw table 볼 때처럼 행마다 자동으로 상세 페이지 링크를 만들어주지
+  않는다 — PK 로 행을 아는 건 테이블 자체를 볼 때뿐이고, 임의 SQL 결과에는 그
+  정보가 없기 때문이다. 그래서 <code>detail</code> 컬럼을 직접 만들어
+  <code>issue_detail</code> 로 보낸다 (아래, GitHub 안 나가고 이 DB 만으로
+  본문+댓글 전부).</p>
 
 databases:
   forge-database:
     queries:
-      cross_repo:
-        title: 횡단 이슈 — 다른 리포를 이름으로 부르는 open 이슈
-        description: 이 집이 존재하는 이유. 이슈의 경계는 리포에서 끝나지 않는다.
-        sql: |-
-          with r as (
-            select replace(name,'"','') n from repository
-            where replace(owner,'"','') = 'junghan0611'
-              and replace(name,'"','') not in ('tuyahome')
-          )
-          select
-            replace(rr.name,'"','')  as repo,
-            i.number                 as "#",
-            replace(i.title,'"','')  as title,
-            'http://127.0.0.1:8071/forge-database/issue_detail?repo='||replace(rr.name,'"','')||'&number='||i.number as detail,
-            'https://github.com/'||replace(rr.owner,'"','')||'/'||replace(rr.name,'"','')||'/issues/'||i.number as url,
-            group_concat(distinct r.n) as mentions,
-            count(distinct r.n)      as n,
-            substr(replace(i.updated,'"',''),1,10) as updated
-          from issue i
-          join repository rr on i.repository = rr.id
-          join r on r.n <> replace(rr.name,'"','')
-               and (i.body like '%'||r.n||'%' or i.title like '%'||r.n||'%')
-          where i.state = 'open'
-            and replace(rr.name,'"','') not in ('tuyahome')
-          group by i.id
-          order by n desc, updated desc
-
       board:
         title: 열린 판 — 리포별 open 이슈 전부
         sql: |-
