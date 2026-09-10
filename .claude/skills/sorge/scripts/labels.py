@@ -98,16 +98,25 @@ BALLS = [
 ]
 HOUSE_COLOR = "EDEDED"
 
-# Houses that carry issues about SOMEBODY ELSE's lane, and therefore need the
-# `house:` vocabulary. `sorge` by design. `agent-config` by history: it WAS the
-# coordination seat before sorge stood up, so it still holds legacy issues whose
-# real lane is elsewhere -- its caretaker measured two (2026-09-10): `#13` is a
-# forge-config lane design, `#6` waits on pi-shell-acp ownership. Without the
-# vocabulary there, those read as agent-config's own work forever and the real
-# house can never pick them up.
+# Repos to PRE-SEED `house:` into. A convenience, not the rule.
 #
-# This list is not a place to be generous. A house earns a row by having such an
-# issue measured in it, not by being likely to.
+# The rule was wrong once and it is worth saying how, because the wrong version
+# reads perfectly sensible: `house:` was gated on WHICH REPO HOLDS THE ISSUE
+# (sorge, later also agent-config as the former coordination seat). But the
+# question a `house:` label answers is not "where was this filed" -- it is "does
+# this issue's work cross houses". Those come apart, and the agent-config
+# caretaker hit the seam within an hour of the first use (2026-09-10): they read
+# `andenken#13`/`#14`, judged part of the work theirs -- the skill surface,
+# `memory-sync`/`semantic-memory`, lives in agent-config -- and then had nowhere
+# to put that judgment, because `andenken` had no `house:` vocabulary. So the
+# judgment evaporated and the next `--mine` call would offer the same two issues
+# as fresh candidates forever.
+#
+# So the gate moved: `ensure_house()` creates the label lazily, in whatever repo
+# turns out to hold a cross-house issue. The original principle survives intact
+# -- do not label where the repo already answers the question -- while the wrong
+# proxy for it is gone. Pre-seeding these two only saves a round-trip on the two
+# repos where it is already known to be needed.
 COORD_HOUSES = {"sorge", "agent-config"}
 
 
@@ -150,6 +159,57 @@ def ensure(houses, dry):
                 continue
             sh(f'gh label create "{name}" -R {OWNER}/{repo} '
                f'--color {color} --description "{desc}" --force')
+
+
+def ensure_house(repo, house, dry):
+    """Create `house:<house>` in `repo` on demand, right before it is needed.
+
+    Lazy on purpose. Pre-creating the whole vocabulary in all thirteen repos
+    would put twelve labels nobody uses into every house -- the "묻지 않은 곳에
+    설치하는 것" this house forbids -- while pre-creating in none loses judgments
+    that were actually made. Creating it at the moment a judgment needs it is the
+    only option that costs nothing and drops nothing.
+    """
+    name = f"house:{house}"
+    r = sh(f"gh label list -R {OWNER}/{repo} --limit 100 --json name -q '.[].name'")
+    if r.returncode == 0 and name in r.stdout.split():
+        return
+    print(f"      (라벨 신설: {repo} ← {name})")
+    if not dry:
+        sh(f'gh label create "{name}" -R {OWNER}/{repo} '
+           f'--color {HOUSE_COLOR} --description "{house} 의 몫" --force')
+
+
+def assign(spec, dry):
+    """`<repo>#<n>=<house>[,<house>]` — record that this issue's work is theirs.
+
+    This is the verb the candidate lane was missing. A caretaker reads a
+    candidate, decides it is (partly) their share, and that decision has to land
+    somewhere or the board will keep proposing it. It lands on the issue.
+    """
+    m = re.match(r"^([A-Za-z0-9._-]+)#(\d+)=(.+)$", spec)
+    if not m:
+        sys.exit(f"형식: <repo>#<번호>=<house>[,<house>]  받은 것: {spec}")
+    repo, num, hs = m.group(1), m.group(2), [h.strip() for h in m.group(3).split(",")]
+    known = ledger_houses()
+    # The issue's OWN repo must be named too, once any house: label exists.
+    # `classify()` reads `hs = labels or [repo]` -- the repo is a FALLBACK, so the
+    # first house: label silently switches it off. Labelling only the newcomer
+    # would therefore evict the owning house from its own issue, which is the
+    # opposite of what the judgment said. Add it back automatically rather than
+    # trusting every caller to remember an implementation detail.
+    if repo in known and repo not in hs:
+        hs.append(repo)
+    for h in hs:
+        if h not in known:
+            sys.exit(f"대장에 없는 집이다: {h}  (대장 밖은 대상이 아니다)")
+    print(f"  {repo}#{num} → " + ",".join(f"house:{h}" for h in hs))
+    for h in hs:
+        ensure_house(repo, h, dry)
+    if dry:
+        return
+    sh(f"gh issue edit {num} -R {OWNER}/{repo} "
+       + " ".join(f'--add-label "house:{h}"' for h in hs))
 
 
 # ── TRIAGE.md 에 갇혀 있던 판정을 라벨로 옮긴다 ──────────────────────
@@ -277,12 +337,19 @@ def main():
     ap.add_argument("--migrate", action="store_true", help="TRIAGE.md 판정을 라벨로")
     ap.add_argument("--from-ref", metavar="REF",
                     help="TRIAGE.md 를 이 커밋에서 읽는다 (포인터로 바뀐 뒤의 재실행)")
+    ap.add_argument("--house", metavar="SPEC", action="append", default=[],
+                    help="후보 판정을 굳힌다: <repo>#<번호>=<house>[,<house>]. "
+                         "라벨이 없으면 그 리포에 신설한다. 여러 번 줄 수 있다")
     ap.add_argument("--go", action="store_true", help="실제로 쓴다 (기본은 dry-run)")
     a = ap.parse_args()
     dry = not a.go
     houses = ledger_houses()
     if dry:
         print("── dry-run. 쓰려면 --go ──\n")
+    if a.house:
+        print(f"후보 판정 굳히기 {len(a.house)}건\n")
+        for spec in a.house:
+            assign(spec, dry)
     if a.ensure:
         print(f"라벨 정의 — 대장 {len(houses)}집\n")
         ensure(houses, dry)
@@ -290,7 +357,7 @@ def main():
         rows = plan(houses, a.from_ref)
         print(f"\nTRIAGE.md → 라벨: {len(rows)}건\n")
         apply(rows, dry)
-    if not (a.ensure or a.migrate):
+    if not (a.ensure or a.migrate or a.house):
         ap.print_help()
 
 
