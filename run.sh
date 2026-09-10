@@ -169,7 +169,10 @@ sorge — 돌봄의 순회
   ./run.sh sweep [인자…]   순회. 인자는 sweep.py 로 그대로 간다
   ./run.sh brief [리포]    브리핑 블록
   ./run.sh board [인자…]   이슈판 — 라이브 표 (gh + 대장 join). --debt --house R --all --json
-  ./run.sh label …         표준 라벨 (--ensure --migrate, 기본 dry-run, 쓰려면 --go)
+  ./run.sh label --set 'R#N=ready,owner' --go   생애 전이 (label-set 단일값)
+  ./run.sh label --house 'R#N=house' --go        몫 판정 굳히기
+  ./run.sh label --ensure                        라벨 정의 (기본 dry-run)
+  ./run.sh label --migrate --from-ref 49ca747     은퇴 전 TRIAGE 재실행 (HEAD 는 포인터라 0건)
   ./run.sh lens            datasette 렌즈 띄우기 (Magit Forge 캐시 · 읽기 전용)
   ./run.sh lens-stop       내리기
   ./run.sh lens-status     상태

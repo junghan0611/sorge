@@ -18,6 +18,8 @@ user_invocable: true
 | 빚 기준 조정 | `… /sweep.py --debt 30` | 기본 15커밋 |
 | **내 몫 — 「판보기 버튼」** | `python3 ~/repos/gh/sorge/.claude/skills/sorge/scripts/board.py --mine` | 인자 없이 부르면 **cwd 의 git remote 로 자기 집을 유추**한다. 확정(라벨/리포)과 후보(남의 집 이슈가 내 리포 이름을 부른 것)를 **갈라서** 낸다 — 후보는 판정이 아니라 제안이므로 담당자가 가른다 |
 | 전체 이슈판 | `… /board.py` · `--debt` · `--house <repo>` · `--all` · `--json` | 대장 join 된 라이브 표. 상태는 **이슈 라벨**에 살고 저장하는 것이 없다. `TRIAGE.md` 는 은퇴했다 |
+| 생애 전이 | `… /labels.py --set '<repo>#<n>=<state>[,<ball>]' --go` | **`label-set`** — 같은 축의 기존 값을 지우고 하나만 쓴다. raw `gh issue edit --add-label` 은 단일값 계약을 못 지킨다 |
+| 몫 판정 굳히기 | `… /labels.py --house '<repo>#<n>=<house>' --go` | 후보를 「내 몫」이라 정했을 때. 그 리포에 라벨이 없으면 신설하고, 자기 집도 자동으로 같이 넣는다 |
 | 표준 라벨 | `… /labels.py --ensure` (기본 dry-run, 쓰려면 `--go`) | `house:` · `state:` · `ball:` 세 축. `state`/`ball` 은 **`label-set` 단일값**이라 재실행이 안전하다 |
 | 기술스택 선례 | `grep -rl "native-image\|graalvm" ~/repos/gh/*/{run.sh,*.nix,*.edn} 2>/dev/null` | 선례 리포를 이름으로 건네고, 그 담당자가 읽게 한다 |
 

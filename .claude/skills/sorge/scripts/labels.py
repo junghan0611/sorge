@@ -252,6 +252,34 @@ def triage_lines(ref):
     return open(TRIAGE, encoding="utf-8").read().splitlines()
 
 
+def transition(spec, dry):
+    """`<repo>#<n>=<state>[,<ball>]` — move an issue along its lifecycle.
+
+    The verb that was missing. `label-set` semantics existed only inside
+    `--migrate`, so every day-to-day transition fell back to a raw
+    `gh issue edit --add-label` -- which cannot keep the single-value contract
+    the whole board depends on. The author of that contract then used raw
+    gh issue edit on sorge#17 within the hour, which is about as clear a
+    demonstration as a missing verb can give (terra, 2026-09-10, 2차 P1).
+    """
+    m = re.match(r"^([A-Za-z0-9._-]+)#(\d+)=(.+)$", spec)
+    if not m:
+        sys.exit(f"형식: <repo>#<번호>=<state>[,<ball>]  받은 것: {spec}")
+    repo, num = m.group(1), int(m.group(2))
+    states = {n.split(":")[1] for n, _, _ in STATES}
+    balls = {n.split(":")[1] for n, _, _ in BALLS}
+    want = []
+    for v in [x.strip() for x in m.group(3).split(",")]:
+        if v in states:
+            want.append(f"state:{v}")
+        elif v in balls:
+            want.append(f"ball:{v}")
+        else:
+            sys.exit(f"모르는 값: {v}\n  state: {' '.join(sorted(states))}"
+                     f"\n  ball : {' '.join(sorted(balls))}")
+    apply([(repo, num, want)], dry)
+
+
 def plan(houses, ref=None):
     live = open_issues()
     rows = []
@@ -340,12 +368,19 @@ def main():
     ap.add_argument("--house", metavar="SPEC", action="append", default=[],
                     help="후보 판정을 굳힌다: <repo>#<번호>=<house>[,<house>]. "
                          "라벨이 없으면 그 리포에 신설한다. 여러 번 줄 수 있다")
+    ap.add_argument("--set", metavar="SPEC", action="append", default=[],
+                    help="생애 전이: <repo>#<번호>=<state>[,<ball>]. "
+                         "같은 축의 기존 값을 지우고 새 값 하나를 쓴다(label-set)")
     ap.add_argument("--go", action="store_true", help="실제로 쓴다 (기본은 dry-run)")
     a = ap.parse_args()
     dry = not a.go
     houses = ledger_houses()
     if dry:
         print("── dry-run. 쓰려면 --go ──\n")
+    if a.set:
+        print(f"생애 전이 {len(a.set)}건\n")
+        for spec in a.set:
+            transition(spec, dry)
     if a.house:
         print(f"후보 판정 굳히기 {len(a.house)}건\n")
         for spec in a.house:
@@ -357,7 +392,7 @@ def main():
         rows = plan(houses, a.from_ref)
         print(f"\nTRIAGE.md → 라벨: {len(rows)}건\n")
         apply(rows, dry)
-    if not (a.ensure or a.migrate or a.house):
+    if not (a.ensure or a.migrate or a.house or a.set):
         ap.print_help()
 
 

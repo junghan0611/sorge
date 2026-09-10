@@ -74,7 +74,21 @@ WT = os.path.expanduser("~/repos/wt")
 # receipt that is NOT derivable -- done_when, who sat, what the review found --
 # lives inside that worktree, written by the house's own citizen. sorge does not
 # write it and does not comment on anybody's issue.
-ATTEMPT_STATES = {"running", "review", "proposed"}
+# `proposed` is deliberately NOT here, and the reason is a mistake worth keeping.
+#
+# LOOP's lifecycle is 분류 → 착수 → 검수 → 제안 → 머지, and I turned each arrow's
+# name into a state value. But 제안 is an ACT sorge performs (sorge→GLG: "이 N개
+# 머지합시다"), not a CONDITION an issue sits in. The agent-config caretaker
+# labelled six issues `state:proposed` meaning "this is a proposal awaiting a
+# decision" -- and that reading is the natural one for a coordination board. The
+# gate then flagged all six as attempts with no worktree, which was the gate
+# accusing them of a mistake that was mine.
+#
+# So `proposed` needs no worktree. Only 착수 and 검수 do, because only those two
+# name work happening in a place. This is the very failure this house names --
+# 같은 낱말이 두 뜻으로 굳는다 -- caught in the vocabulary I wrote to prevent it,
+# an hour after writing it (terra 2차 + agent-config usage, 2026-09-10).
+ATTEMPT_STATES = {"running", "review"}
 
 
 def attempt(house, number):
@@ -311,6 +325,43 @@ def render(rows, houses, show_out=False, total=None):
               f"~/repos/wt 에 자리가 없다")
         for r in ghost:
             print(f"    {r['repo']}#{r['number']:<4} state:{r['state']}  {r['title'][:52]}")
+        print()
+
+    # A directory is not a receipt. Checking only that the worktree exists let the
+    # gate read green on doomemacs-config#11 -- worktree present, NEXT--attempt-*
+    # absent, and its done_when/impl/defects still only in `git show
+    # 49ca747:TRIAGE.md` (terra, 2026-09-10, 2차 P1). The contract says the
+    # receipt is the attempt's canonical record, so its absence is exactly as
+    # loud as a missing worktree.
+    bare = [r for r in tgt
+            if r["state"] in ATTEMPT_STATES and r["wt"] and not r["receipt"]]
+    if bare:
+        print(f"⚠ receipt 없는 attempt {len(bare)} — 워크트리는 있는데 "
+              f"NEXT--attempt-* 가 없다 (그 집 시민이 쓴다)")
+        for r in bare:
+            print(f"    {r['repo']}#{r['number']:<4} state:{r['state']}  {r['title'][:52]}")
+        print()
+
+    # And the same check in reverse, which nothing was doing. A worktree with no
+    # lifecycle label is just as unexplained as a label with no worktree, but it
+    # hides better: the issue shows up in the debt list, which reads as "nobody
+    # has classified this yet" rather than "somebody is already working on it".
+    # entwurf#110 was exactly that -- ~/repos/wt/entwurf/110 on branch
+    # fix/110-second-checkout, labels [] (terra, 2026-09-10, 2차 P1).
+    orphan = []
+    for r in tgt:
+        if r["state"] in ATTEMPT_STATES:
+            continue
+        for h in r["houses"]:
+            if attempt(h, r["number"])[0]:
+                orphan.append((r, h))
+                break
+    if orphan:
+        print(f"⚠ 라벨 없는 워크트리 {len(orphan)} — 자리는 있는데 state 가 없다. "
+              f"진행인가 잔해인가는 그 집이 판정한다")
+        for r, h in orphan:
+            print(f"    {r['repo']}#{r['number']:<4} ~/repos/wt/{h}/{r['number']}"
+                  f"  {r['title'][:44]}")
         print()
 
     if debt:
