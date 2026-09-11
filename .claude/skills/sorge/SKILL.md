@@ -18,9 +18,9 @@ user_invocable: true
 | 빚 기준 조정 | `… /sweep.py --debt 30` | 기본 15커밋 |
 | **내 몫 — 「판보기 버튼」** | `python3 ~/repos/gh/sorge/.claude/skills/sorge/scripts/board.py --mine` | 인자 없이 부르면 **cwd 의 git remote 로 자기 집을 유추**한다. **확정만 낸다** — `house:` 라벨이 붙었거나 그 집 이슈인 것. 대장에 없는 집이면 「밖이다」라고 먼저 말한다(「할 일 없음」과 구분). 옛 **후보 레인(리포 이름 전문검색)은 2026-09-10 GLG 판정으로 은퇴**했다 — *"라벨에 리포이름을 넣자고했는데 텍스트로 검색하면 안된다"*. 아직 판정 안 된 횡단 일은 **판의 미분류 레인**에 있고 sorge 가 읽는다 |
 | 전체 이슈판 | `… /board.py` · `--debt` · `--house <repo>` · `--all` · `--json` | 대장 join 된 라이브 표. 상태는 **이슈 라벨**에 살고 저장하는 것이 없다. `TRIAGE.md` 는 은퇴했다 |
-| 생애 전이 | `… /labels.py --set '<repo>#<n>=<state>[,<ball>]' --go` | **`label-set`** — 같은 축의 기존 값을 지우고 하나만 쓴다. raw `gh issue edit --add-label` 은 단일값 계약을 못 지킨다 |
+| 판정 전이 | `… /labels.py --set '<repo>#<n>=<state>[,<ball>][,<priority>][,<brief>]' --go` | **sorge만** `label-set`으로 같은 축의 기존 값을 지우고 하나만 쓴다. `priority:none`·`brief:none`은 잘못된 판단의 명시 철회다. `priority`는 전체 판 위 GLG 순서, `brief`는 담당자 thread의 명시를 sorge가 확인한 결과다 |
 | 몫 판정 굳히기 | `… /labels.py --house '<repo>#<n>=<house>' --go` | **미분류를 읽고** 「이건 저 집 몫이다」라고 정했을 때. 그 리포에 라벨이 없으면 신설하고, 자기 집도 자동으로 같이 넣는다. 이것이 텍스트 검색을 대신하는 자리다 — 낱말 운이 아니라 읽은 사람의 판정이 적힌다 |
-| 표준 라벨 | `… /labels.py --ensure` (기본 dry-run, 쓰려면 `--go`) | `house:` · `state:` · `ball:` 세 축. `state`/`ball` 은 **`label-set` 단일값**이라 재실행이 안전하다 |
+| 표준 라벨 | `… /labels.py --ensure` (기본 dry-run, 쓰려면 `--go`) | `house:`(여럿) · `state:`·`ball:`·`priority:`·`brief:`(각 단일값). 이슈 작성자는 라벨을 모른다. sorge만 `priority`를 전체 판에서 정리하고, 담당자 thread의 목표·범위·검증·권한 경계를 확인한 뒤 `brief:steward-ready`를 붙인다 |
 | 기술스택 선례 | `grep -rl "native-image\|graalvm" ~/repos/gh/*/{run.sh,*.nix,*.edn} 2>/dev/null` | 선례 리포를 이름으로 건네고, 그 담당자가 읽게 한다 |
 
 판정을 적는 곳은 `~/repos/gh/sorge/LEDGER.md` 하나다. **sweep은 아무것도 쓰지 않는다.**

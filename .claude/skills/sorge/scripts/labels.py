@@ -3,13 +3,22 @@
 
 THE STANDARD
 ------------
-Three axes, namespaced `ns:value`. Nothing else. A label is self-describing
-wherever it is read, so the scheme survives a move to GitLab or Forgejo without
-a translation table -- the forge only has to store strings.
+Five axes, namespaced `ns:value`. A label is self-describing wherever it is
+read, so the scheme survives a move to GitLab or Forgejo without a translation
+table -- the forge only has to store strings.
 
-    house:<repo>    whose lane is this          (many allowed)
-    state:<value>   where in the lifecycle      (single-valued)
-    ball:<who>      who must move next          (single-valued)
+    house:<repo>                  whose lane is this              (many allowed)
+    state:<value>                 where in the lifecycle          (single-valued)
+    ball:<who>                    who must move next              (single-valued)
+    priority:<quadrant>           sorge records GLG's order         (single-valued)
+    brief:steward-ready           sorge attests a usable brief      (single-valued)
+
+Issue writers need not know this vocabulary. `priority:` is never inferred:
+absent is not the fourth quadrant, but an order sorge has not yet made from the
+whole board under GLG's direction. `brief:steward-ready` is never self-awarded
+by the autonomous loop or the issue author. The caretaker first writes the live
+thread's goal, scope/exclusions, verification, and authority/side-effect
+boundary; sorge then records that measured judgment.
 
 The GRAMMAR is inherited from forge-config's sweeper protocol, which already
 proved it on live repos: `agent:ready|running|done|blocked`, set with `label-set`
@@ -34,6 +43,12 @@ construction rather than by discipline.
 Likewise `house:` is omitted where the issue's repo already answers it. In
 `entwurf`, an issue is obviously entwurf's. The label earns its place only on
 coordination issues -- filed in `sorge`, about somebody else's lane.
+
+`priority:` and `brief:` are different kinds of sorge judgment. The former
+records GLG's importance/urgency order; absence is not a low-priority value. The
+latter records that a caretaker has supplied a concrete brief in the live issue
+thread. Neither is a conclusion an issue author or autonomous loop may write
+after scanning text.
 
 WHAT LABELS CANNOT HOLD
 -----------------------
@@ -106,29 +121,17 @@ BALLS = [
     ("ball:glg",   "D93F0B", "공은 GLG 에게 — 사람만 닫을 수 있다"),
     ("ball:sorge", "C5DEF5", "공은 sorge 에게 — 가리키고 넘길 몫"),
 ]
+PRIORITIES = [
+    ("priority:important-urgent", "B60205", "중요 · 긴급"),
+    ("priority:important-not-urgent", "D93F0B", "중요 · 안 긴급"),
+    ("priority:not-important-urgent", "FBCA04", "안 중요 · 긴급"),
+    ("priority:not-important-not-urgent", "BFBFBF", "안 중요 · 안 긴급 — 나중을 위해 보관"),
+]
+BRIEFS = [
+    ("brief:steward-ready", "1D76DB", "담당자의 실행 지침이 live thread에 준비됨"),
+]
+SINGLETON_PREFIXES = ("state:", "ball:", "priority:", "brief:")
 HOUSE_COLOR = "EDEDED"
-
-# Repos to PRE-SEED `house:` into. A convenience, not the rule.
-#
-# The rule was wrong once and it is worth saying how, because the wrong version
-# reads perfectly sensible: `house:` was gated on WHICH REPO HOLDS THE ISSUE
-# (sorge, later also agent-config as the former coordination seat). But the
-# question a `house:` label answers is not "where was this filed" -- it is "does
-# this issue's work cross houses". Those come apart, and the agent-config
-# caretaker hit the seam within an hour of the first use (2026-09-10): they read
-# `andenken#13`/`#14`, judged part of the work theirs -- the skill surface,
-# `memory-sync`/`semantic-memory`, lives in agent-config -- and then had nowhere
-# to put that judgment, because `andenken` had no `house:` vocabulary. So the
-# judgment evaporated and the next `--mine` call would offer the same two issues
-# as fresh candidates forever.
-#
-# So the gate moved: `ensure_house()` creates the label lazily, in whatever repo
-# turns out to hold a cross-house issue. The original principle survives intact
-# -- do not label where the repo already answers the question -- while the wrong
-# proxy for it is gone. Pre-seeding these two only saves a round-trip on the two
-# repos where it is already known to be needed.
-COORD_HOUSES = {"sorge", "agent-config"}
-
 
 def sh(cmd, check=True):
     r = subprocess.run(cmd, shell=True, capture_output=True, text=True)
@@ -149,15 +152,12 @@ def ledger_houses():
 def ensure(houses, dry):
     """Create the label definitions. Idempotent; never deletes.
 
-    `--ensure` pre-seeds `house:` labels only into COORD_HOUSES. Other repos get
-    one only through `ensure_house()` when an actual cross-house judgment needs
-    it; the issue's own repo never needs its own `house:` label.
+    `house:` is never pre-seeded merely because a repo entered the ledger or
+    appeared in prose. `ensure_house()` creates it only when sorge has read an
+    actual cross-house judgment; the issue's own repo never needs its own label.
     """
     for repo in houses:
-        want = list(STATES) + list(BALLS)
-        if repo in COORD_HOUSES:
-            want += [(f"house:{h}", HOUSE_COLOR, f"{h} 의 몫")
-                     for h in houses if h != repo]
+        want = list(STATES) + list(BALLS) + list(PRIORITIES) + list(BRIEFS)
         have = set()
         r = sh(f"gh label list -R {OWNER}/{repo} --limit 100 --json name -q '.[].name'")
         if r.returncode == 0:
@@ -262,7 +262,7 @@ def triage_lines(ref):
 
 
 def transition(spec, dry):
-    """`<repo>#<n>=<state>[,<ball>]` — move an issue along its lifecycle.
+    """`<repo>#<n>=<state>[,<ball>][,<axis:none>]` — set or clear judgments.
 
     The verb that was missing. `label-set` semantics existed only inside
     `--migrate`, so every day-to-day transition fell back to a raw
@@ -270,23 +270,51 @@ def transition(spec, dry):
     the whole board depends on. The author of that contract then used raw
     gh issue edit on sorge#17 within the hour, which is about as clear a
     demonstration as a missing verb can give (terra, 2026-09-10, 2차 P1).
+
+    `priority:` and `brief:` travel through the same atomic setter only so an
+    old value cannot accumulate. Their authorship is still outside this function:
+    sorge records GLG's whole-board priority, and sorge records the brief only
+    after the house caretaker has written the issue thread's goal,
+    scope/exclusions, verification, and side-effect boundary.
     """
     m = re.match(r"^([A-Za-z0-9._-]+)#(\d+)=(.+)$", spec)
     if not m:
-        sys.exit(f"형식: <repo>#<번호>=<state>[,<ball>]  받은 것: {spec}")
+        sys.exit(f"형식: <repo>#<번호>=<state>[,<ball>][,<priority>][,<brief>] "
+                 f"(철회: priority:none 또는 brief:none)  받은 것: {spec}")
     repo, num = m.group(1), int(m.group(2))
-    states = {n.split(":")[1] for n, _, _ in STATES}
-    balls = {n.split(":")[1] for n, _, _ in BALLS}
-    want = []
-    for v in [x.strip() for x in m.group(3).split(",")]:
-        if v in states:
-            want.append(f"state:{v}")
-        elif v in balls:
-            want.append(f"ball:{v}")
+    vocabularies = {
+        "state": {n.split(":")[1] for n, _, _ in STATES},
+        "ball": {n.split(":")[1] for n, _, _ in BALLS},
+        "priority": {n.split(":")[1] for n, _, _ in PRIORITIES},
+        "brief": {n.split(":")[1] for n, _, _ in BRIEFS},
+    }
+    selected, clear = {}, set()
+    for token in [x.strip() for x in m.group(3).split(",")]:
+        # Prefixes are optional for ordinary values (`ready`) but REQUIRED for
+        # `none`: a bare none has no axis and must never clear by guesswork.
+        if ":" in token:
+            axis, value = token.split(":", 1)
+            if axis not in vocabularies or (value != "none" and value not in vocabularies[axis]):
+                choices = "\n  ".join(
+                    f"{name:<8}: {' '.join(sorted(values))}"
+                    for name, values in vocabularies.items())
+                sys.exit(f"모르는 값: {token}\n  {choices}")
         else:
-            sys.exit(f"모르는 값: {v}\n  state: {' '.join(sorted(states))}"
-                     f"\n  ball : {' '.join(sorted(balls))}")
-    apply([(repo, num, want)], dry)
+            value = token
+            matches = [axis for axis, values in vocabularies.items() if value in values]
+            if len(matches) != 1:
+                choices = "\n  ".join(
+                    f"{name:<8}: {' '.join(sorted(values))}"
+                    for name, values in vocabularies.items())
+                sys.exit(f"모르는 값: {token}\n  {choices}")
+            axis = matches[0]
+        if axis in selected or axis in clear:
+            sys.exit(f"같은 축을 한 번에 둘 이상 정할 수 없다: {axis}")
+        if value == "none":
+            clear.add(axis)
+        else:
+            selected[axis] = f"{axis}:{value}"
+    apply([(repo, num, list(selected.values()), clear)], dry)
 
 
 def plan(houses, ref=None):
@@ -348,17 +376,21 @@ def plan(houses, ref=None):
 def apply(rows, dry):
     """Set, don't add.
 
-    `state:` and `ball:` are contracted single-valued, and an --add-label-only
-    writer cannot keep that promise: re-run after a correction and the issue
-    carries both the old and the new value, with the board silently reading
-    whichever the API returns first. So every write first REMOVES the other
-    values in that namespace, making the operation idempotent and the invariant
-    true by construction rather than by nobody having pressed it twice yet.
+    `state:`, `ball:`, `priority:`, and `brief:` are contracted single-valued,
+    and an --add-label-only writer cannot keep that promise: re-run after a
+    correction and the issue carries both the old and the new value, with the
+    board silently reading whichever the API returns first. So every write first
+    REMOVES the other values in that namespace, making the operation idempotent
+    and the invariant true by construction rather than by nobody having pressed
+    it twice yet.
     This is forge-config's `label-set` rule ("avoid accumulating"), which sorge
     inherited in name and now actually implements.
     """
-    for repo, num, labels in rows:
-        want_ns = {l.split(":")[0] for l in labels if l.startswith(("state:", "ball:"))}
+    for row in rows:
+        repo, num, labels = row[:3]
+        clear_ns = set(row[3]) if len(row) == 4 else set()
+        want_ns = ({l.split(":")[0] for l in labels if l.startswith(SINGLETON_PREFIXES)}
+                   | clear_ns)
         cur = []
         r = sh(f"gh issue view {num} -R {OWNER}/{repo} --json labels "
                f"-q '.labels[].name'")
@@ -389,8 +421,9 @@ def main():
                     help="횡단 몫 판정을 굳힌다: <repo>#<번호>=<house>[,<house>]. "
                          "라벨이 없으면 그 리포에 신설한다. 여러 번 줄 수 있다")
     ap.add_argument("--set", metavar="SPEC", action="append", default=[],
-                    help="생애 전이: <repo>#<번호>=<state>[,<ball>]. "
-                         "같은 축의 기존 값을 지우고 새 값 하나를 쓴다(label-set)")
+                    help="sorge 판정 전이: <repo>#<번호>=<state>[,<ball>][,<priority>][,<brief>]. "
+                         "같은 축의 기존 값을 지우고 새 값 하나를 쓴다(label-set). priority:none 또는 "
+                         "brief:none 으로 sorge가 잘못된 판정을 철회한다")
     ap.add_argument("--go", action="store_true", help="실제로 쓴다 (기본은 dry-run)")
     a = ap.parse_args()
     dry = not a.go

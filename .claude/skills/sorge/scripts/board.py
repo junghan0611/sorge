@@ -57,20 +57,35 @@ LEDGER = os.path.join(SORGE, "LEDGER.md")
 
 OWNER = "junghan0611"
 
-# The three axes. Namespaced `ns:value` so a label is self-describing wherever it
-# is read -- GitHub today, GitLab or Forgejo tomorrow. The shape is inherited
-# from forge-config's sweeper protocol (`agent:ready|running|done|blocked`,
-# single-valued via `label-set`), deliberately: that lane already proved the
-# shape on live repos. The VALUES differ because the lifecycles differ -- there,
-# `agent:done` means "first-review triage completed"; here the lifecycle is
-# 분류 → 착수 → 검수 → 제안 → 머지|폐기. Same grammar, different vocabulary; do
-# not alias one onto the other.
-NS_HOUSE = "house:"   # whose lane is this. Only needed where issue repo != work repo.
-NS_STATE = "state:"   # where in the lifecycle. Single-valued.
-NS_BALL = "ball:"     # who must move next. Single-valued.
+# The five axes. Namespaced `ns:value` so a label is self-describing wherever it
+# is read -- GitHub today, GitLab or Forgejo tomorrow. `priority:` is sorge's
+# record of GLG's whole-board order, never a heuristic: absent means no order has
+# been made, not the fourth quadrant. `brief:steward-ready` is sorge's attestation
+# that the caretaker's live issue thread holds a concrete execution brief. The
+# autonomous loop reads these judgments; it never manufactures either one from a
+# title or body.
+NS_HOUSE = "house:"       # whose lane is this. Only needed where issue repo != work repo.
+NS_STATE = "state:"       # where in the lifecycle. Single-valued.
+NS_BALL = "ball:"         # who must move next. Single-valued.
+NS_PRIORITY = "priority:" # sorge's record of GLG's quadrant. Single-valued.
+NS_BRIEF = "brief:"       # sorge's caretaker-brief attestation. Single-valued.
+SINGLETON_PREFIXES = (NS_STATE, NS_BALL, NS_PRIORITY, NS_BRIEF)
 
 STATE_ORDER = ["blocked", "proposed", "review", "running", "ready", "parked"]
 BALL_ORDER = ["glg", "owner", "sorge"]
+PRIORITY_ORDER = [
+    "important-urgent",
+    "important-not-urgent",
+    "not-important-urgent",
+    "not-important-not-urgent",
+]
+PRIORITY_MARK = {
+    "important-urgent": "중긴",
+    "important-not-urgent": "중안",
+    "not-important-urgent": "안긴",
+    "not-important-not-urgent": "안안",
+}
+BRIEF_READY = "steward-ready"
 
 WT = os.path.expanduser("~/repos/wt")
 
@@ -193,7 +208,7 @@ def fetch(query):
 
 
 def classify(node, houses):
-    """Turn one issue's labels into the three axes, then join with the ledger.
+    """Turn one issue's labels into the five axes, then join with the ledger.
 
     The issue's own repo is always one house -- in `entwurf` the house is
     obviously entwurf, so a `house:entwurf` label would be noise. `house:` adds
@@ -211,8 +226,12 @@ def classify(node, houses):
     # that looks perfectly normal. Reporting `ambiguous` is the honest failure.
     sv = [l[len(NS_STATE):] for l in labels if l.startswith(NS_STATE)]
     bv = [l[len(NS_BALL):] for l in labels if l.startswith(NS_BALL)]
+    pv = [l[len(NS_PRIORITY):] for l in labels if l.startswith(NS_PRIORITY)]
+    fv = [l[len(NS_BRIEF):] for l in labels if l.startswith(NS_BRIEF)]
     state = sv[0] if len(sv) == 1 else (None if not sv else "ambiguous")
     ball = bv[0] if len(bv) == 1 else (None if not bv else "ambiguous")
+    priority = pv[0] if len(pv) == 1 else (None if not pv else "ambiguous")
+    brief = fv[0] if len(fv) == 1 else (None if not fv else "ambiguous")
     target = any(h in houses for h in hs)
     wt_ok, receipt = (None, None)
     if state in ATTEMPT_STATES:
@@ -236,6 +255,8 @@ def classify(node, houses):
         "labelled_houses": labelled,
         "state": state,
         "ball": ball,
+        "priority": priority,
+        "brief": brief,
         "target": target,
         # Unclassified is not a value you write down -- it is the ABSENCE of a
         # judgment, so it can never go stale. This is the row that used to be
@@ -243,9 +264,8 @@ def classify(node, houses):
         "unclassified": target and state is None,
         "wt": wt_ok,
         "receipt": receipt,
-        "ambiguous": "ambiguous" in (state, ball),
-        "other": [l for l in labels
-                  if not l.startswith((NS_HOUSE, NS_STATE, NS_BALL))],
+        "ambiguous": "ambiguous" in (state, ball, priority, brief),
+        "other": [l for l in labels if not l.startswith((NS_HOUSE,) + SINGLETON_PREFIXES)],
     }
 
 
@@ -306,14 +326,10 @@ def mine(repo, houses):
       판정   `--house <repo>#<n>=<house>` writes what the reading found.
       몫     그 담당자가 여기서 확정으로 받는다.
 
-    CAUTION, and this comment must not settle it: `LOOP.md:61` states the rule as
-    「라벨 없음 = 미분류」 while `board.py` computes `state is None`. Those differ
-    for an issue that carries a `house:` judgment and no lifecycle state -- today
-    exactly one, `sorge#12` (measured 2026-09-10, cross-review by terra). A repo
-    judgment IS a judgment, so under the written rule that issue is triaged and
-    under the code it is debt. Which one is the 정본 is GLG's, not this comment's:
-    a comment that resolves a contract it merely observes is the fault this house
-    was warned about by its own reviewer.
+    `house:` is a cross-house judgment, not a lifecycle state. The contract and
+    code therefore agree: **only a missing `state:` is unclassified**. A row may
+    name another house and still need lifecycle classification; `sorge#12` was
+    the receipt that forced this distinction (terra review, 2026-09-10).
 
     Measured the same day: 10 cross-filed issues carry a `house:` label naming a
     repo other than the one they live in, and ALL 10 arrive here through 확정.
@@ -424,7 +440,7 @@ def render(rows, houses, show_out=False, total=None):
 
     amb = [r for r in tgt if r["ambiguous"]]
     if amb:
-        print(f"⚠ 단일값 위반 {len(amb)} — state/ball 이 둘 이상이다. label-set 으로 고쳐라")
+        print(f"⚠ 단일값 위반 {len(amb)} — state/ball/priority/brief 가 둘 이상이다. label-set 으로 고쳐라")
         for r in amb:
             print(f"    {r['repo']}#{r['number']}")
         print()
@@ -477,9 +493,26 @@ def render(rows, houses, show_out=False, total=None):
         print()
 
     if debt:
-        print(f"■ 미분류 {len(debt)} — 라벨이 없다. 이게 유일한 빚이다.")
+        print(f"■ 미분류 {len(debt)} — lifecycle 라벨이 없다. 이게 유일한 분류 빚이다.")
         for r in sorted(debt, key=lambda r: r["updated"]):
             print(f"    {r['repo']}#{r['number']:<4} {r['updated']}  {r['title'][:66]}")
+        print()
+
+    # A ready owner issue is NOT autonomous work merely because it sounds small.
+    # It needs both sorge's explicit GLG-priority record and sorge's verified
+    # caretaker brief; absence is a stop signal, never an invitation for the loop
+    # to infer intent.
+    unready = [r for r in tgt if r["state"] == "ready" and r["ball"] == "owner"
+               and (r["priority"] not in PRIORITY_ORDER or r["brief"] != BRIEF_READY)]
+    if unready:
+        print(f"⚠ 자율 착수 보류 {len(unready)} — sorge 우선순위 정리 또는 담당자 실행 지침 확인이 없다")
+        for r in sorted(unready, key=lambda r: (r["repo"], r["number"])):
+            missing = []
+            if r["priority"] not in PRIORITY_ORDER:
+                missing.append("sorge priority")
+            if r["brief"] != BRIEF_READY:
+                missing.append("sorge brief 확인")
+            print(f"    {r['repo']}#{r['number']:<4} {' · '.join(missing):<22} {r['title'][:48]}")
         print()
 
     by_house = {}
@@ -493,14 +526,18 @@ def render(rows, houses, show_out=False, total=None):
     for h in sorted(by_house):
         rs = by_house[h]
         print(f"▸ {h}  ({len(rs)})")
-        rs.sort(key=lambda r: (STATE_ORDER.index(r["state"])
+        rs.sort(key=lambda r: (PRIORITY_ORDER.index(r["priority"])
+                               if r["priority"] in PRIORITY_ORDER else 99,
+                               STATE_ORDER.index(r["state"])
                                if r["state"] in STATE_ORDER else 99, r["number"]))
         for r in rs:
             mark = STATE_MARK.get(r["state"], f"? {r['state']}")
             ball = BALL_MARK.get(r["ball"], "—")
+            priority = PRIORITY_MARK.get(r["priority"], "미정")
+            brief = "✓" if r["brief"] == BRIEF_READY else "—"
             tag = f"  [{','.join(r['other'])}]" if r["other"] else ""
             src = f"{r['repo']}#{r['number']}"
-            print(f"    {mark:<8} 공={ball:<4} {src:<22} {r['title'][:52]}{tag}")
+            print(f"    {mark:<8} 우={priority:<2} 지침={brief} 공={ball:<4} {src:<22} {r['title'][:52]}{tag}")
         print()
 
     if show_out:

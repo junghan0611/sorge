@@ -50,16 +50,31 @@ sorge 자신은 코드를 고치지 않고, 이슈에 답글도 달지 않는다
 
 ## 상태 — 이슈 라벨. 문서 아님
 
-`ns:value` 세 축뿐. 문법은 `forge-config` 스위퍼 규약에서 물려받았다(`label-set` 단일값).
+`ns:value` 다섯 축. 문법은 `forge-config` 스위퍼 규약에서 물려받았다(`label-set` 단일값).
 
 ```
-house:<repo>   누구 몫인가. 여럿 가능. 이슈 리포 ≠ 일하는 집일 때만 붙인다
-state:         ready · running · review · proposed · blocked · parked
-ball:          owner · glg · sorge
+house:<repo>                    누구 몫인가. 여럿 가능. 이슈 리포 ≠ 일하는 집일 때만 붙인다
+state:                           ready · running · review · proposed · blocked · parked
+ball:                            owner · glg · sorge
+priority:important-urgent        중요 + 긴급
+priority:important-not-urgent    중요 + 안 긴급
+priority:not-important-urgent    안 중요 + 긴급
+priority:not-important-not-urgent 안 중요 + 안 긴급 — 나중을 위해 보관
+brief:steward-ready              sorge가 담당자의 실행 지침을 확인했다
 ```
 
-**라벨 없음 = 미분류 = 빚 전부.** 적을 게 없으니 낡을 수도 없다.
-`state`·`ball` 이 둘 이상 붙으면 `board` 가 `⚠ 단일값 위반` 으로 띄운다.
+**이슈를 남기는 이는 이 라벨을 알 필요가 없다.** GPT 앱·봇·담당자·옆 형제가 자유롭게 이슈를
+남기고, **sorge만** 전체 판을 읽어 라벨을 정리한다. `priority:`는 sorge가 GLG의 우리 쪽 순서를
+기록한 것이다. 제목·날짜·모델 확신으로 사분면을 추정하지 않으며, 없는 `priority:`는
+「안 중요+안 긴급」이 아니라 **sorge가 아직 우선순위를 정리하지 않음**이다.
+
+**`brief:steward-ready`도 sorge의 확인 라벨이다.** 담당자는 live issue thread에 최소한
+목표·범위/제외·검증(done_when 또는 관측)·권한/외부부작용 경계를 적는다. sorge가 그 명시를
+확인하기 전에는 label을 붙이지 않는다. 자동 루프는 그 글을 대충 읽어 준비됐다고 판정하지
+않으며, brief가 없으면 그 집 담당자에게 명확화를 요청할 뿐 작업을 열지 않는다.
+
+**라벨 없음 = lifecycle 미분류 = 분류 빚.** `priority:`/`brief:` 부재는 별도의 **자율 착수 중지**다.
+`state`·`ball`·`priority`·`brief` 이 둘 이상 붙으면 `board` 가 `⚠ 단일값 위반` 으로 띄운다.
 
 **receipt 는 attempt 워크트리에 산다** — `~/repos/wt/<house>/<이슈>/NEXT--attempt-*`,
 그 집 시민이 쓰고 그 집 시민이 읽는다. `done_when` · `impl` · `defects` 가 거기 있다.
@@ -69,18 +84,24 @@ sorge 는 거기에 쓰지 않고, 남의 이슈에 코멘트도 달지 않는�
 워크트리와 짝이 맞는 낡은 문자열이 남는다 — `done_when` 둘째 게이트가 없는 디렉터리를 향해
 초록불을 켤 수 있었던 자리다(terra 검수 P0-2, 2026-09-10). `board` 가 매번 실재를 확인한다.
 
-## 착수 조건 — 격자가 스스로 선다
+## 착수 조건 — 자율 실행기가 생길 때의 gate
 
-전부 맞으면 루프가 GLG 손 없이 워크트리를 판다:
+**현재 sorge에는 worktree를 파거나 시민을 부르는 실행기가 없다.** `board`는 priority/brief 누락을
+보여 주는 읽기면일 뿐이다. 아래는 나중에 그 실행기가 생길 때 직접 구현·테스트해야 할 gate다 —
+문서에 있다고 자동으로 강제되는 것이 아니다.
+
+전부 맞을 때에만 그 실행기가 GLG 손 없이 워크트리를 팔 수 있다:
 
 ```
-ball:owner ∧ house∈대장 ∧ authority≤쓰기 ∧ reversible=예(쓰기가 wt 안)
-  ∧ money=아니오 ∧ trust∈{GLG본인,형제} ∧ deadline=없음 ∧ 살아있는 attempt=0
+state:ready ∧ ball:owner ∧ priority∈사분면 ∧ brief:steward-ready ∧ house∈대장
+  ∧ authority≤쓰기 ∧ reversible=예(쓰기가 wt 안) ∧ money=아니오
+  ∧ trust∈{GLG본인,형제} ∧ deadline=없음 ∧ 살아있는 attempt=0
 ```
 
 `trust=외부` 는 무조건 `ball:glg` — 발신자를 못 믿는데 자동 착수하면 그게 프롬프트 인젝션의 문이다.
-`deadline` 이 있으면 GLG가 알아야 하므로 역시 `ball:glg`.
-**모델 자기 확신도는 쓰지 않는다.** 권한·되돌리기·금전·신뢰·기한 다섯으로만 가른다.
+`deadline` 이 있으면 GLG가 알아야 하므로 역시 `ball:glg`. 우선순위는 이 안전문을 넘는 허가가 아니라,
+통과한 일들의 정렬일 뿐이다.
+**모델 자기 확신도는 쓰지 않는다.** sorge가 기록한 GLG 우선순위·sorge가 확인한 담당자 지침·권한·되돌리기·금전·신뢰·기한으로만 가른다.
 
 ## 착수 — 워크트리
 
