@@ -1,6 +1,6 @@
 ---
 name: sorge
-description: "돌봄 — 대장에 오른 GLG의 리포를 가로질러 보고, 그 담당자에게 그의 몫을 돌려준다. 대상 목록은 GLG가 요청할 때만 늘어난다. 담당자 문서가 낡았는지, 자기수선 스킬이 필요한지, 비슷한 flake/run.sh 선례가 어디 있는지(Clojure는 JVM이 아니라 GraalVM native-image), 한 곳에서 얻은 발견이 어느 리포들에 걸리는지. 대신 해주지 않고 브리핑까지 한다. 트리거: 'sorge', '소르게', '돌봄', '순회', '리포 감수', '담당자 문서', '여기 담당자 누구지', '노트 업뎃해', '수선 스킬', '비슷한 flake 있나', '선례 찾아', '내 몫', '내가 할 일', '판보기', '이슈판', 'board', '내 몫 뭐야', '지금 뭐가 열려있지'."
+description: "돌봄 — 대장에 오른 GLG의 리포를 가로질러 보고, 그 담당자에게 그의 몫을 돌려준다. 대상 목록은 GLG가 요청할 때만 늘어난다. 담당자 문서가 낡았는지, 자기수선 스킬이 필요한지, 비슷한 flake/run.sh 선례가 어디 있는지(Clojure는 JVM이 아니라 GraalVM native-image), 한 곳에서 얻은 발견이 어느 리포들에 걸리는지. 대신 해주지 않고 브리핑까지 한다. 트리거: 'sorge', '소르게', '돌봄', '순회', '리포 감수', '담당자 문서', '여기 담당자 누구지', '노트 업뎃해', '수선 스킬', '비슷한 flake 있나', '선례 찾아', '내 몫', '내가 할 일', '판보기', '이슈판', 'board', '내 몫 뭐야', '지금 뭐가 열려있지', '이슈 라벨', '우선순위 정리', '담당자 배정', '이슈 판 정리'."
 user_invocable: true
 ---
 
@@ -18,10 +18,30 @@ user_invocable: true
 | 빚 기준 조정 | `… /sweep.py --debt 30` | 기본 15커밋 |
 | **내 몫 — 「판보기 버튼」** | `python3 ~/repos/gh/sorge/.claude/skills/sorge/scripts/board.py --mine` | 인자 없이 부르면 **cwd 의 git remote 로 자기 집을 유추**한다. **확정만 낸다** — `house:` 라벨이 붙었거나 그 집 이슈인 것. 대장에 없는 집이면 「밖이다」라고 먼저 말한다(「할 일 없음」과 구분). 옛 **후보 레인(리포 이름 전문검색)은 2026-09-10 GLG 판정으로 은퇴**했다 — *"라벨에 리포이름을 넣자고했는데 텍스트로 검색하면 안된다"*. 아직 판정 안 된 횡단 일은 **판의 미분류 레인**에 있고 sorge 가 읽는다 |
 | 전체 이슈판 | `… /board.py` · `--debt` · `--house <repo>` · `--all` · `--json` | 대장 join 된 라이브 표. 상태는 **이슈 라벨**에 살고 저장하는 것이 없다. `TRIAGE.md` 는 은퇴했다 |
-| 판정 전이 | `… /labels.py --set '<repo>#<n>=<state>[,<ball>][,<priority>][,<brief>]' --go` | **sorge만** `label-set`으로 같은 축의 기존 값을 지우고 하나만 쓴다. `priority:none`·`brief:none`은 잘못된 판단의 명시 철회다. `priority`는 전체 판 위 GLG 순서, `brief`는 담당자 thread의 명시를 sorge가 확인한 결과다 |
+| 판정 전이 | `… /labels.py --set '<repo>#<n>=<axis-value>[,...]' --go` | 한 번에 고른 축만 바꾼다. 예: `priority:important-urgent`, `ball:owner`, 또는 `ready,owner,important-urgent,steward-ready`. **sorge만** 같은 축의 기존 값을 지우고 하나만 쓴다. `priority:none`·`brief:none`은 잘못된 판단의 명시 철회다 |
 | 몫 판정 굳히기 | `… /labels.py --house '<repo>#<n>=<house>' --go` | **미분류를 읽고** 「이건 저 집 몫이다」라고 정했을 때. 그 리포에 라벨이 없으면 신설하고, 자기 집도 자동으로 같이 넣는다. 이것이 텍스트 검색을 대신하는 자리다 — 낱말 운이 아니라 읽은 사람의 판정이 적힌다 |
 | 표준 라벨 | `… /labels.py --ensure` (기본 dry-run, 쓰려면 `--go`) | `house:`(여럿) · `state:`·`ball:`·`priority:`·`brief:`(각 단일값). 이슈 작성자는 라벨을 모른다. sorge만 `priority`를 전체 판에서 정리하고, 담당자 thread의 목표·범위·검증·권한 경계를 확인한 뒤 `brief:steward-ready`를 붙인다 |
 | 기술스택 선례 | `grep -rl "native-image\|graalvm" ~/repos/gh/*/{run.sh,*.nix,*.edn} 2>/dev/null` | 선례 리포를 이름으로 건네고, 그 담당자가 읽게 한다 |
+
+## 이슈판을 읽고 라벨을 정리할 때
+
+`board`는 현황이 아니라 **GLG의 다음 판단을 고르는 면**이다. 이슈 작성자·봇·옆 형제는 라벨을 몰라도 되고, sorge만 판을 읽어 아래 네 가지를 기록한다. 제목·날짜·모델 확신으로 추정하지 않는다.
+
+| 판정 | 라벨 | 뜻 |
+|---|---|---|
+| 어느 리포의 담당자 몫인가 | `house:<repo>` | **리포 배정**. 이슈가 든 리포는 이미 자기 집이며, 횡단 몫만 `--house`로 더한다 |
+| 누가 다음에 움직이나 | `ball:owner\|glg\|sorge` | **사람 이름 배정이 아니라 다음 공의 자리**. `owner`는 `house`가 가리킨 그 집 담당자다 |
+| GLG가 정한 순서 | `priority:<4분면>` | 중요/긴급은 GLG의 전체 판정이다. 없다는 것은 낮은 우선순위가 아니라 **미정**이다 |
+| 자율 착수 가능한 지침이 섰나 | `brief:steward-ready` | 담당자 thread에 목표·범위/제외·검증·권한 경계가 적힌 것을 sorge가 확인한 결과다 |
+
+한 회차는 이 순서로 끝낸다.
+
+1. `./run.sh board`로 **미분류 → 자율 착수 보류 → GLG 공 → running/review 경고** 순서로 본다.
+2. 이슈를 읽은 뒤 횡단 몫이면 `./run.sh label --house 'sorge#19=agent-config,andenken' --go`처럼 `house:`를 기록한다. 대장 밖 리포는 배정하지 않는다.
+3. GLG가 사분면을 말하면 그 축만 `./run.sh label --set 'sorge#19=priority:important-urgent' --go`로 기록한다. 다른 축은 보존된다.
+4. 담당자가 thread에 concrete brief를 남긴 뒤에만 `./run.sh label --set 'sorge#19=ready,owner,steward-ready' --go`로 다음 공과 착수 가능성을 굳힌다. 실제 착수는 `state:running`; 검수는 `state:review`; GLG의 머지 판단 대기는 `state:proposed`다.
+
+라벨은 **판정만** 기록한다. 댓글·닫기·남의 리포 수정은 sorge의 일이 아니다. shipped 이슈의 종료는 그 집 담당자가 기존 receipt를 근거로 닫는다.
 
 판정을 적는 곳은 `~/repos/gh/sorge/LEDGER.md` 하나다. **sweep은 아무것도 쓰지 않는다.**
 
