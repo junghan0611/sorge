@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
-"""sorge robomp — ON 스위치. GitHub 이슈 훅 → `sorge-label` 프로파일 루프.
+"""sorge robomp — ON 스위치. GitHub 이슈 훅 → stock RobOMP 루프.
 
 WHY THIS EXISTS
 ----------------
-`sorge#22` Phase 0: 이슈 사건이 매번 fresh 담당자 턴을 깨우고, 그 턴은 라벨
-판정만 남기고 끝난다. 하네스는 새로 짓지 않는다 — OMP 의 RobOMP
-(`~/repos/3rd/pi/oh-my-pi/python/robomp`) 가 입구다. 이 스크립트는 그 위에
-얹는 **손잡이**다: RobOMP 를 켜고/끄고/보는 것만 한다. `sorge-label` 프로파일
-자체(어떤 host tool 을 노출하는지, fresh 세션인지)는 fork 쪽 코드가 결정한다
-(`ROBOMP_TASK_PROFILE`) — 여기서는 정의하지 않는다.
+`sorge#22` Phase 0: 이슈 사건이 담당자 턴을 깨우고 판정이 남는다. 하네스는
+새로 짓지 않는다 — OMP 의 RobOMP (`~/repos/3rd/pi/oh-my-pi/python/robomp`) 가
+입구다. 이 스크립트는 그 위에 얹는 **손잡이**다: 켜고/끄고/보는 것만 한다.
+
+**프로파일은 우리가 정의하지 않는다.** stock RobOMP 가 주는 흐름(분류 → 댓글
+→ 수정 → 브랜치 → PR)을 그대로 쓴다. 2026-09-15 GLG 판정: fork 를 고치면
+omp 버전업이 막힌다 — 좁히려던 1188줄을 되돌리고 `sorge-label` 프로파일은
+곁가지 `sorge-label-profile` 에만 남겼다. 여기서 정하는 것은 **설정뿐**이다:
+어느 리포(대장 allowlist), 어느 모델(API 키로 닿는 것), 어느 봇 이름.
 
 경계 — 이 스크립트가 절대 하지 않는 것
 --------------------------------------
@@ -60,17 +63,23 @@ PROXY_HOST = "127.0.0.1"
 PROXY_PORT = 8081
 
 DEFAULT_OMP_ROOT = HOME / "repos" / "3rd" / "pi" / "oh-my-pi"
-DEFAULT_AGENT_DIR = HOME / ".omp" / "agent"
+
+# 루프가 쓰는 모델. 호스트 구독(`~/.omp/agent/agent.db`)은 자식이 못 본다 —
+# stock robomp 는 agent_dir 을 자식에게 넘기지 않고, 자식은 격리 XDG 로 뜬다.
+# 그래서 여기 있는 것은 반드시 **API 키로 닿는 provider** 여야 한다.
+# 2026-09-15 실측: anthropic 401 · openai 401 · deepseek 200 · gemini 200.
+MODEL = "deepseek/deepseek-v4-pro"
+THINKING = "high"
+PROVIDER_KEY_ENV = "DEEPSEEK_API_KEY"
 
 # 봇 계정 토큰: orchestrator/gh-proxy 가 매일 쓰는 것. 판정은 sorge-bot 이름으로
-# 남아야 하고, 그래야 자기재기동 가드(`ROBOMP_SELF_LOGINS`)가 GLG 가 연 이슈를
-# 삼키지 않는다. classic: `gh webhook forward` 만 (admin:repo_hook 이 거기에만
+# 남아야 한다. classic: `gh webhook forward` 만 (admin:repo_hook 이 거기에만
 # 있고, 후크 등록은 리포 소유자인 GLG 의 권한이다).
 BOT_LOGIN = "sorge-bot"
 PASS_PAT_BOT = "api/github/sorge-bot/pat"
 PASS_PAT_CLASSIC = "api/github/junghan0611/forge/pat"
 
-SECRET_KEYS = {"GITHUB_WEBHOOK_SECRET", "ROBOMP_GH_PROXY_HMAC_KEY", "GITHUB_TOKEN"}
+SECRET_KEYS = {"GITHUB_WEBHOOK_SECRET", "ROBOMP_GH_PROXY_HMAC_KEY", "GITHUB_TOKEN", PROVIDER_KEY_ENV}
 
 
 class Halt(Exception):
@@ -378,10 +387,10 @@ def cmd_status(_args):
         print(f"  config 없음 — {ROBOMP_ENV} 가 아직 없다. `./run.sh robomp on --go` 로 켠다.")
         repos = []
     else:
-        print(f"  profile       {cfg.get('ROBOMP_TASK_PROFILE', '?')}")
+        print(f"  profile       stock full (우리가 프로파일을 정의하지 않는다 — omp 버전업을 막지 않으려고)")
         print(f"  model         {cfg.get('ROBOMP_MODEL', '?')}  (thinking={cfg.get('ROBOMP_THINKING', '?')})")
-        print(f"  agent dir     {cfg.get('ROBOMP_AGENT_DIR', '?')}")
-        print(f"  self logins   {cfg.get('ROBOMP_SELF_LOGINS', '?')}")
+        print(f"  provider key  {PROVIDER_KEY_ENV} {'있음' if cfg.get(PROVIDER_KEY_ENV) else '없음 — 판정 턴이 인증 실패한다'}")
+        print(f"  bot login     {cfg.get('ROBOMP_BOT_LOGIN', '?')}")
         allow = cfg.get("ROBOMP_REPO_ALLOWLIST", "")
         print(f"  allowlist     {allow or '(비었다)'}")
         repos = [r for r in allow.split(",") if r]
@@ -512,20 +521,28 @@ def _on_steps(dry):
     hmac_key = existing.get("ROBOMP_GH_PROXY_HMAC_KEY") or secrets.token_hex(32)
     print(f"   GITHUB_WEBHOOK_SECRET     {'재사용' if 'GITHUB_WEBHOOK_SECRET' in existing else '새로 생성'} (값은 안 찍는다)")
     print(f"   ROBOMP_GH_PROXY_HMAC_KEY  {'재사용' if 'ROBOMP_GH_PROXY_HMAC_KEY' in existing else '새로 생성'} (값은 안 찍는다)")
+    provider_key = os.environ.get(PROVIDER_KEY_ENV, "") or existing.get(PROVIDER_KEY_ENV, "")
+    if not provider_key and not dry:
+        raise Halt(
+            f"{PROVIDER_KEY_ENV} 가 없다 — {MODEL} 로는 못 돈다.\n"
+            f"     자식 omp 는 격리 XDG 로 떠서 호스트 구독(agent.db)을 못 본다. "
+            f"셸에 키를 넣고 다시 `on` 해라: export {PROVIDER_KEY_ENV}=..."
+        )
+    print(f"   {PROVIDER_KEY_ENV}            {'환경에서 읽음' if os.environ.get(PROVIDER_KEY_ENV) else ('기존 파일 재사용' if provider_key else '없음')} (값은 안 찍는다)")
     values = {
         "GITHUB_WEBHOOK_SECRET": webhook_secret,
         "ROBOMP_BOT_LOGIN": BOT_LOGIN,
         # config.py 의 orchestrator Settings 는 이 둘을 필수로 요구한다
-        # (`git_author_email: str = Field(..., ...)`, 기본값 없음). `sorge-label`
-        # 프로파일은 gh_push_branch 를 쓰지 않아 실사용은 안 되지만, Settings()
-        # 생성 자체가 이 값 없이는 즉시 실패한다 — 그래서 계약 표엔 없어도 넣는다.
+        # (`git_author_email: str = Field(..., ...)`, 기본값 없음). stock full
+        # 프로파일은 gh_push_branch 를 실제로 쓰므로 여기 값이 커밋 저자가 된다.
         "ROBOMP_GIT_AUTHOR_NAME": existing.get("ROBOMP_GIT_AUTHOR_NAME", "sorge-robomp"),
         "ROBOMP_GIT_AUTHOR_EMAIL": existing.get("ROBOMP_GIT_AUTHOR_EMAIL", "sorge-robomp@users.noreply.github.com"),
-        "ROBOMP_SELF_LOGINS": BOT_LOGIN,
-        "ROBOMP_TASK_PROFILE": "sorge-label",
-        "ROBOMP_MODEL": "anthropic/claude-sonnet-4-6",
-        "ROBOMP_THINKING": "high",
-        "ROBOMP_AGENT_DIR": str(DEFAULT_AGENT_DIR),
+        "ROBOMP_MODEL": MODEL,
+        "ROBOMP_THINKING": THINKING,
+        # 자식 omp 는 격리 XDG 로 뜨고 호스트 `agent.db` 를 못 본다 (stock 은
+        # agent_dir 설정 자체가 없다). 그래서 자격증명은 provider API 키 축뿐이고,
+        # 이 키는 stock 의 scrub 목록(`worker.py:127-134`)에 없어서 자식까지 닿는다.
+        PROVIDER_KEY_ENV: provider_key,
         "ROBOMP_REPO_ALLOWLIST": ",".join(allow_repos),
         "ROBOMP_GH_PROXY_URL": f"http://{PROXY_HOST}:{PROXY_PORT}",
         "ROBOMP_GH_PROXY_HMAC_KEY": hmac_key,
@@ -533,9 +550,10 @@ def _on_steps(dry):
         "ROBOMP_SQLITE_PATH": str(sqlite_path),
         "ROBOMP_LOG_DIR": str(app_log_dir),
         "ROBOMP_NATIVES_CACHE_ROOT": str(natives_root),
-        "ROBOMP_PR_REVIEW_ENABLED": "false",
+        # 나머지 동작은 stock 기본값을 그대로 둔다 — 우리가 값을 적는 순간
+        # 그것이 관리 대상이 되고, omp 버전업 때 기본값 변화를 못 따라간다.
+        # 예외 하나: 자동 close 는 GLG 의 이슈를 무인으로 닫으므로 끈다.
         "ROBOMP_QUESTION_AUTOCLOSE_ENABLED": "false",
-        "ROBOMP_RELEASE_SENTINEL_ENABLED": "false",
         "ROBOMP_BIND_HOST": ORCH_HOST,
         "ROBOMP_BIND_PORT": str(ORCH_PORT),
     }
