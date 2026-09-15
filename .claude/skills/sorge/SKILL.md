@@ -22,6 +22,7 @@ user_invocable: true
 | 몫 판정 굳히기 | `… /labels.py --house '<repo>#<n>=<house>' --go` | **미분류를 읽고** 「이건 저 집 몫이다」라고 정했을 때. 그 리포에 라벨이 없으면 신설하고, 자기 집도 자동으로 같이 넣는다. 이것이 텍스트 검색을 대신하는 자리다 — 낱말 운이 아니라 읽은 사람의 판정이 적힌다 |
 | 표준 라벨 | `… /labels.py --ensure` (기본 dry-run, 쓰려면 `--go`) | `house:`(여럿) · `state:`·`ball:`·`priority:`·`brief:`(각 단일값). 이슈 작성자는 라벨을 모른다. sorge만 `priority`를 전체 판에서 정리하고, 담당자 thread의 목표·범위·검증·권한 경계를 확인한 뒤 `brief:steward-ready`를 붙인다 |
 | 기술스택 선례 | `grep -rl "native-image\|graalvm" ~/repos/gh/*/{run.sh,*.nix,*.edn} 2>/dev/null` | 선례 리포를 이름으로 건네고, 그 담당자가 읽게 한다 |
+| GitHub 이슈 훅 ON 스위치 (`sorge#22` Phase 0) | `./run.sh robomp status` · `allowlist` · `on [--go]` (기본 dry-run) · `off` | RobOMP(`~/repos/3rd/pi/oh-my-pi/python/robomp`)를 `sorge-label` 프로파일로 켠다 — 이슈 사건마다 fresh 턴을 깨우고 **라벨 판정만** 남기고 끝낸다. `allowlist`는 `board.ledger_houses()`를 그대로 쓴다(중복 구현 없음) — **대장에 없는 리포는 훅이 안 켜진다** |
 
 ## 이슈판을 읽고 라벨을 정리할 때
 

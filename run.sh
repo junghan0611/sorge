@@ -21,7 +21,7 @@ SORGE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SWEEP="$SORGE_DIR/.claude/skills/sorge/scripts/sweep.py"
 BOARD="$SORGE_DIR/.claude/skills/sorge/scripts/board.py"
 LABELS="$SORGE_DIR/.claude/skills/sorge/scripts/labels.py"
-METADATA="$SORGE_DIR/datasette/metadata.yml"
+ROBOMP="$SORGE_DIR/.claude/skills/sorge/scripts/robomp.py"
 BOARD_PORT="${SORGE_BOARD_PORT:-8071}"
 
 # 이슈판이 얹히는 DB. 이 집 것이 아니다 -- Magit Forge 가 쓰는 GLG 의 로컬
@@ -41,6 +41,7 @@ sweep_board() { python3 "$SWEEP" "$@"; }
 # 이슈판 — 라이브. 저장하지 않는다. 상태는 이슈 라벨에 산다.
 board_show()  { python3 "$BOARD" "$@"; }
 board_label() { python3 "$LABELS" "$@"; }
+board_robomp() { python3 "$ROBOMP" "$@"; }
 
 sweep_brief() {
     local repo="${1:-}"
@@ -178,6 +179,10 @@ sorge — 돌봄의 순회
   ./run.sh lens-status     상태
   ./run.sh age             DB 나이·규모
   ./run.sh pull [force]    forge-pull (정책은 doomemacs-config 소유)
+  ./run.sh robomp status                          gh-proxy/orchestrator/forward 생사 + allowlist + 최근 이벤트
+  ./run.sh robomp allowlist                       대장 배정 리포 → owner/repo (ledger_houses 재사용)
+  ./run.sh robomp on [--go]                       venv→env→gh-proxy→orchestrator→forward 순서로 켠다 (기본 dry-run)
+  ./run.sh robomp off                             pidfile 기준으로 전부 내린다
 
 판정은 LEDGER.md 가 든다. 이 스크립트는 손잡이일 뿐이다.
 EOF
@@ -195,6 +200,7 @@ main() {
             lens-status)  board_status ;;
             age)          board_age ;;
             pull)         shift; board_pull "${1:-}" ;;
+            robomp)       shift; board_robomp "$@" ;;
             -h|--help|help) usage ;;
             *)            error "모르는 명령: $1"; echo ""; usage; exit 1 ;;
         esac
