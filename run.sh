@@ -30,7 +30,7 @@ FORGE_DB="$HOME/doomemacs/.local/etc/forge/forge-database.sqlite"
 
 need() {
     command -v "$1" >/dev/null 2>&1 && return 0
-    error "$1 이(가) 없다. $2"
+    error "$1 is missing. $2"
     return 1
 }
 
@@ -59,20 +59,20 @@ board_pid() { ss -ltnp 2>/dev/null | grep -oP "(?<=pid=)\d+(?=,fd)" <<<"$(ss -lt
 board_status() {
     local pid; pid="$(board_pid || true)"
     if [[ -n "$pid" ]]; then
-        success "이슈판 떠 있다 — http://127.0.0.1:$BOARD_PORT (pid $pid)"
+        success "lens up — http://127.0.0.1:$BOARD_PORT (pid $pid)"
         return 0
     fi
-    info "이슈판 안 떠 있다 (포트 $BOARD_PORT)"
+    info "lens down (port $BOARD_PORT)"
     return 1
 }
 
 board_start() {
-    need datasette "nixos-config 가 1층으로 넣는다 — 그 집 담당자에게." || return 1
-    [[ -f "$FORGE_DB" ]] || { error "forge DB 가 없다: $FORGE_DB"; return 1; }
+    need datasette "nixos-config puts it on the first floor — ask that steward." || return 1
+    [[ -f "$FORGE_DB" ]] || { error "forge DB missing: $FORGE_DB"; return 1; }
 
     if board_status >/dev/null 2>&1; then
         board_status
-        warn "이미 떠 있다. 다시 띄우려면 stop 먼저."
+        warn "already up. stop it first to relaunch."
         return 0
     fi
 
@@ -85,15 +85,15 @@ board_start() {
     sleep 4
 
     if curl -sf -m 5 -o /dev/null "http://127.0.0.1:$BOARD_PORT/"; then
-        success "이슈판 → http://127.0.0.1:$BOARD_PORT"
+        success "lens → http://127.0.0.1:$BOARD_PORT"
         echo ""
-        echo "  열린 판     /forge-database/board"
-        echo "  리포별      /forge-database/by_repo"
-        echo "  오래된 것   /forge-database/stale_open"
+        echo "  open board   /forge-database/board"
+        echo "  by repo      /forge-database/by_repo"
+        echo "  stale open   /forge-database/stale_open"
         echo ""
-        info "로그: /tmp/sorge-board.log"
+        info "log: /tmp/sorge-board.log"
     else
-        error "안 떴다. 로그를 봐라: /tmp/sorge-board.log"
+        error "did not come up. read the log: /tmp/sorge-board.log"
         tail -5 /tmp/sorge-board.log 2>/dev/null || true
         return 1
     fi
@@ -101,8 +101,8 @@ board_start() {
 
 board_stop() {
     local pid; pid="$(board_pid || true)"
-    if [[ -z "$pid" ]]; then info "안 떠 있다."; return 0; fi
-    kill "$pid" && success "이슈판 내렸다 (pid $pid)"
+    if [[ -z "$pid" ]]; then info "already down."; return 0; fi
+    kill "$pid" && success "lens down (pid $pid)"
 }
 
 board_pull() {
@@ -114,19 +114,19 @@ board_pull() {
     [[ "$force" == "force" ]] && call="(my/forge-pull-all t)"
     info "forge-pull: $call"
     if ! timeout 180 emacsclient -s user --eval "$call"; then
-        error "GLG 의 Emacs(user 소켓)가 응답하지 않는다. 사람이 띄우는 자리다."
+        error "GLG's Emacs (user socket) is not answering. that one is a human's seat."
         return 1
     fi
 }
 
 board_age() {
-    [[ -f "$FORGE_DB" ]] || { error "forge DB 가 없다"; return 1; }
+    [[ -f "$FORGE_DB" ]] || { error "forge DB missing"; return 1; }
     local mt now hrs
     mt=$(stat -c %Y "$FORGE_DB"); now=$(date +%s)
     hrs=$(( (now - mt) / 3600 ))
-    echo "  DB 갱신: $(date -d "@$mt" '+%Y-%m-%d %H:%M')  (${hrs}시간 전)"
+    echo "  DB updated: $(date -d "@$mt" '+%Y-%m-%d %H:%M')  (${hrs}h ago)"
     sqlite3 -cmd '.timeout 5000' "file:$FORGE_DB?mode=ro" \
-        "select '  리포 '||count(distinct repository)||' · open '||sum(state='open')||' · 전체 '||count(*) from issue"
+        "select '  repos '||count(distinct repository)||' · open '||sum(state='open')||' · total '||count(*) from issue"
 }
 
 # ── 메뉴 ────────────────────────────────────────────────
@@ -134,57 +134,66 @@ board_age() {
 show_menu() {
     echo ""
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo -e "${GREEN}sorge${NC} — 대신 해주지 않고 앞서 간다"
+    echo -e "${GREEN}sorge${NC} — leap ahead, never leap in"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo ""
-    echo -e "  ${YELLOW}순회${NC}"
-    echo "    i) 이슈판 (라이브 · 라벨 기준)"
-    echo "    1) 판 세우기 (sweep — 빚·문서 미정·대상 밖)"
-    echo "    2) 브리핑 전부 (형제에게 그대로 던질 블록)"
-    echo "    3) 한 리포만 브리핑 (대상 밖도 답한다)"
-    echo "    4) 빚 기준 바꿔 보기 (기본 15커밋)"
+    echo -e "  ${YELLOW}Sweep${NC}"
+    echo "    i) issue board (live · labels are the state)"
+    echo "    1) sweep (debt · undecided docs · out of scope)"
+    echo "    2) brief all (blocks to hand a sibling as-is)"
+    echo "    3) brief one repo (answers even out of scope)"
+    echo "    4) sweep with another debt threshold (default 15)"
     echo ""
-    echo -e "  ${YELLOW}이슈판 (Magit Forge 캐시 · GitHub)${NC}"
-    echo "    b) datasette 렌즈 → http://127.0.0.1:$BOARD_PORT"
-    echo "    s) 상태"
-    echo "    q) 내리기"
-    echo "    a) DB 나이·규모"
-    echo "    p) forge-pull (stale 이면만)"
-    echo "    P) forge-pull 강제"
+    echo -e "  ${YELLOW}Issue loop (stock RobOMP · sorge-bot)${NC}"
+    echo "    5) status — proxy/orchestrator/forwarders, model, allowlist"
+    echo "    6) on (dry-run — prints what it would do)"
+    echo "    7) on --go (venv → env → proxy → orchestrator → forwarders)"
+    echo "    8) off (stop everything, delete relay hooks)"
+    echo "    9) judge one issue by hand (owner/repo#NN)"
     echo ""
-    echo -e "  ${YELLOW}대장${NC}"
-    echo "    l) LEDGER.md 열기"
-    echo "    n) NEXT.md 열기"
+    echo -e "  ${YELLOW}Forge lens (Magit Forge cache · read-only)${NC}"
+    echo "    b) datasette lens → http://127.0.0.1:$BOARD_PORT"
+    echo "    s) lens status"
+    echo "    q) lens down"
+    echo "    a) DB age and size"
+    echo "    p) forge-pull (only when stale)"
+    echo "    P) forge-pull (forced)"
     echo ""
-    echo "    0) 나가기"
+    echo -e "  ${YELLOW}Ledger${NC}"
+    echo "    l) open LEDGER.md"
+    echo "    n) open NEXT.md"
+    echo ""
+    echo "    0) quit"
     echo ""
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 }
 
 usage() {
     cat <<EOF
-sorge — 돌봄의 순회
+sorge — the caretaker sweep
 
-  ./run.sh                 메뉴
-  ./run.sh sweep [인자…]   순회. 인자는 sweep.py 로 그대로 간다
-  ./run.sh brief [리포]    브리핑 블록
-  ./run.sh board [인자…]   이슈판 — 라이브 표 (gh + 대장 join). --debt --house R --mine [R] --all --json
+  ./run.sh                 interactive menu
+  ./run.sh sweep [args…]   sweep. args pass straight to sweep.py
+  ./run.sh brief [repo]    briefing block(s)
+  ./run.sh board [args…]   live issue board (gh + ledger join). --debt --house R --mine [R] --all --json
   ./run.sh label --set 'R#N=ready,owner,important-urgent,steward-ready' --go
-                                             판정 전이 (label-set 단일값; priority:none/brief:none으로 철회)
-  ./run.sh label --house 'R#N=house' --go        몫 판정 굳히기
-  ./run.sh label --ensure                        라벨 정의 (기본 dry-run)
-  ./run.sh label --migrate --from-ref 49ca747     은퇴 전 TRIAGE 재실행 (HEAD 는 포인터라 0건)
-  ./run.sh lens            datasette 렌즈 띄우기 (Magit Forge 캐시 · 읽기 전용)
-  ./run.sh lens-stop       내리기
-  ./run.sh lens-status     상태
-  ./run.sh age             DB 나이·규모
-  ./run.sh pull [force]    forge-pull (정책은 doomemacs-config 소유)
-  ./run.sh robomp status                          gh-proxy/orchestrator/forward 생사 + allowlist + 최근 이벤트
-  ./run.sh robomp allowlist                       대장 배정 리포 → owner/repo (ledger_houses 재사용)
-  ./run.sh robomp on [--go]                       venv→env→gh-proxy→orchestrator→forward 순서로 켠다 (기본 dry-run)
-  ./run.sh robomp off                             pidfile 기준으로 전부 내린다
+                           lifecycle transition (single-value axes; priority:none/brief:none withdraws)
+  ./run.sh label --house 'R#N=house' --go        pin whose share it is
+  ./run.sh label --ensure                        define labels (dry-run by default)
+  ./run.sh lens            datasette lens (Magit Forge cache · read-only)
+  ./run.sh lens-stop       lens down
+  ./run.sh lens-status     lens status
+  ./run.sh age             DB age and size
+  ./run.sh pull [force]    forge-pull (policy owned by doomemacs-config)
 
-판정은 LEDGER.md 가 든다. 이 스크립트는 손잡이일 뿐이다.
+Issue loop — stock RobOMP, no fork patches:
+  ./run.sh robomp status              proxy/orchestrator/forwarder liveness, model, allowlist, recent events
+  ./run.sh robomp allowlist           ledger-assigned repos → owner/repo (reuses ledger_houses)
+  ./run.sh robomp on [--go]           venv → env → gh-proxy → orchestrator → forwarders (dry-run by default)
+  ./run.sh robomp off                 stop everything by pidfile, delete relay hooks
+  ./run.sh robomp judge owner/repo#NN  queue one issue by hand, no webhook needed
+
+The ledger holds the verdicts. This script is only a handle.
 EOF
 }
 
@@ -202,21 +211,26 @@ main() {
             pull)         shift; board_pull "${1:-}" ;;
             robomp)       shift; board_robomp "$@" ;;
             -h|--help|help) usage ;;
-            *)            error "모르는 명령: $1"; echo ""; usage; exit 1 ;;
+            *)            error "unknown command: $1"; echo ""; usage; exit 1 ;;
         esac
         return
     fi
 
     while true; do
         show_menu
-        read -rp "선택: " choice
+        read -rp "choice: " choice
         echo ""
         case $choice in
             1) sweep_board ;;
             2) sweep_brief ;;
-            3) read -rp "리포 이름: " r; [[ -n "$r" ]] && sweep_brief "$r" ;;
-            4) read -rp "빚 기준 커밋 수: " d; [[ -n "$d" ]] && sweep_board --debt "$d" ;;
+            3) read -rp "repo name: " r; [[ -n "$r" ]] && sweep_brief "$r" ;;
+            4) read -rp "debt threshold (commits): " d; [[ -n "$d" ]] && sweep_board --debt "$d" ;;
             i) board_show ;;
+            5) board_robomp status ;;
+            6) board_robomp on ;;
+            7) board_robomp on --go ;;
+            8) board_robomp off ;;
+            9) read -rp "issue ref (owner/repo#NN): " ref; [[ -n "$ref" ]] && board_robomp judge "$ref" ;;
             b) board_start ;;
             s) board_status || true ;;
             q) board_stop ;;
@@ -225,11 +239,11 @@ main() {
             P) board_pull force ;;
             l) ${PAGER:-less} "$SORGE_DIR/LEDGER.md" ;;
             n) ${PAGER:-less} "$SORGE_DIR/NEXT.md" ;;
-            0) info "나간다."; exit 0 ;;
-            *) error "잘못된 선택" ;;
+            0) info "bye."; exit 0 ;;
+            *) error "invalid choice" ;;
         esac
         echo ""
-        read -rp "계속하려면 Enter…"
+        read -rp "press Enter to continue…"
     done
 }
 

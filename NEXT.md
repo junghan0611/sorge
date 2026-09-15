@@ -18,20 +18,39 @@
 
 - **Current:** 이슈판이 섰고 두 집(sorge·agent-config)이 같은 판을 본다.
   **숫자는 여기 적지 않는다** — `./run.sh board` 가 매번 유도한다(파생 저장 금지, terra 2차 P2)
-- **Next:** (1) `v2026.9.8` 태그/릴리즈 정합 판정을 GLG 에게 받는다(백필 vs 절 정정)
-  → (2) `board` 가 띄우는 세 경고를 그 집들에 넘긴다 — `entwurf#78`(자리 없음) ·
+- **Next:** (1) **stock 루프를 켜 두고 sorge-bot 이 기본을 하는지 본다**(`./run.sh robomp on --go`).
+  안정되면 넓힌다 — 좁히는 수단은 fork 가 아니라 프롬프트·라벨 규약·이슈 본문이다
+  → (2) `v2026.9.8` 태그/릴리즈 정합 판정을 GLG 에게 받는다(백필 vs 절 정정)
+  → (3) `board` 가 띄우는 세 경고를 그 집들에 넘긴다 — `entwurf#78`(자리 없음) ·
   `doomemacs-config#11`(receipt 없음) · `entwurf#110`(라벨 없는 워크트리)
-  → (3) 남은 미분류를 각 집 담당자가 `board --mine` 으로 갚게 한다
 - **Blocker:** 없음
-- **Read:** `AGENTS.md`(자리) · `LOOP.md`(계약) · `labels.py` 헤더(라벨이 왜 그 모양인가)
+- **Read:** `AGENTS.md`(자리) · `LOOP.md`(계약) · `labels.py` 헤더(라벨이 왜 그 모양인가) ·
+  운전법은 담당자 문서 `denote:20260227T031800` §절차
 - **Do not touch:**
   - 남의 리포에 커밋. **발견·명명·전달까지다**
   - 대장에 유도 가능한 사실. **판정만**
-  - 이슈 **코멘트·닫기**. 라벨만 열렸다
+  - **`oh-my-pi` fork 에 줄을 넣는 것.** stock RobOMP 를 그대로 쓴다 — 고치는 순간 omp
+    버전업이 막힌다(GLG, 2026-09-15)
   - `agent-config` 에 스킬 사본. 실물 하나, 나머지 링크
+
+**손이 둘이고 권한이 다르다.** 순회(사람이 부르는 sorge)는 여전히 **라벨만** 쓴다 —
+코멘트·닫기는 닫혀 있다(`LOOP.md § never`). stock 루프의 `sorge-bot` 은 GLG 가
+2026-09-15 에 stock 흐름을 그대로 받아들여 **댓글·브랜치·PR 까지 열려 있다.** 둘을
+같은 규칙으로 읽지 마라. 무인 close 는 양쪽 다 닫혀 있다
+(`ROBOMP_QUESTION_AUTOCLOSE_ENABLED=false`).
 
 # RECENT
 
+- **[2026-09-15] 우리 요구를 벗고 stock 으로 갔다.** 오전엔 `sorge-label` 프로파일을
+  fork 에 얹어 「라벨만 쓰는 좁은 봇」을 만들었다(1,188줄). 오후에 GLG 가 뒤집었다 —
+  *"omp 를 수정하면 안돼. 그래야 omp 버전업을 할수가 있거든."* fork main 을 상류
+  `f97fa5c` 로 되돌리고 폐기분은 곁가지 `sorge-label-profile` 에 남겼다.
+  **되돌리니 셋 다 필요 없었다**: 봇 이슈 skip 은 도달 불가(stock 에 이슈 생성 도구가
+  없다), 프로파일 1,057줄은 좁히기, 자격증명 symlink 는 **모델 교체로 코드 0줄에 풀렸다**
+  (설정으로 풀 것을 코드로 풀었던 것 — 이게 가장 아픈 종류다). 라이브 증거 `sorge#25`:
+  사건 → HMAC 202 → dedup → worktree → fresh 턴 → 라벨 + 댓글 → `rpc_done`, fork diff 0.
+  인계 문서 `NEXT--robomp-handoff.md` 는 삭제했다 — `LEDGER.md:118` 의 자기 규율대로
+  **안 움직이는 것**(담당자 문서 §절차 · `sorge#22`)이 그 내용을 든다.
 - **[2026-09-10] 상태면이 문서에서 라벨로 옮겨갔다.** `TRIAGE.md` 56,928 → 554 bytes,
   `LOOP.md` 223 → 128줄. 세 축(`house:` `state:` `ball:`), `label-set` 단일값.
   **라벨 없음 = 미분류 = 빚 전부** — 적을 게 없으니 낡을 수도 없다.
