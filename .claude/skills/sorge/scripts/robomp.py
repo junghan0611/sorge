@@ -196,18 +196,22 @@ def gh_api(token, method, path, body=None):
         raise RuntimeError(f"GitHub 도달 실패: {exc.reason}") from exc
 
 
-def bot_token_check(dry, token, repos):
-    """봇 토큰이 **그 이름으로 라벨을 쓸 수 있는가** — 비파괴로 묻는다.
+def bot_writable_repos(dry, token, repos):
+    """대장 대상 중 **봇이 실제로 판정을 쓸 수 있는 집**만 남긴다.
 
     읽기는 신호가 아니다. 대상 리포가 전부 public 이라 토큰이 없어도 200 이
-    나온다. 쓰기만 신호다.
+    나온다. 쓰기만 신호이고, 쓰기는 두 가지로 막힌다:
 
-    그리고 여기서 갈리는 것이 하나 있다: fine-grained PAT 는 **발급 계정이
-    소유한** 리포에만 권한을 줄 수 있다. collaborator 로 초대돼 push 권한이
-    있어도 GLG 소유 리포에는 `403 Resource not accessible by personal access
-    token` 이 난다(2026-09-15 실측). 그래서 봇 토큰은 classic + `public_repo`
-    여야 하고, 그 구분이 이 자리에서 드러나야 한다 — 프로세스를 띄운 뒤
-    첫 판정이 403 으로 죽는 것보다 낫다.
+    1. **토큰 종류.** fine-grained PAT 는 발급 계정이 *소유한* 리포에만 권한을
+       줄 수 있다. collaborator 로 push 권한이 있어도 GLG 소유 리포에는
+       `403 Resource not accessible by personal access token` 이 난다
+       (2026-09-15 실측). classic + `public_repo` 여야 한다.
+    2. **초대.** 초대되지 않은 집은 `404 Not Found` 다 — 권한 문제가 아니라
+       봇이 그 집에 아예 없는 것이다.
+
+    둘을 갈라 보여주고, 쓸 수 있는 집만 allowlist 로 넘긴다. 초대 안 된 집을
+    allowlist 에 남기면 그 집 이슈마다 턴이 열려 403/404 로 죽는다 — 대장은
+    대상을 정하지만 **닿을 수 있는지는 대장이 모른다.**
     """
     status, who = gh_api(token, "GET", "/user")
     login = (who or {}).get("login") if status == 200 else None
@@ -218,23 +222,66 @@ def bot_token_check(dry, token, repos):
         f"토큰 주인이 {login or f'불명({status})'} 이다 — {BOT_LOGIN} 이어야 한다",
     )
 
-    probe = repos[0]
-    status, labels = gh_api(token, "GET", f"/repos/{probe}/labels?per_page=1")
-    if status != 200 or not isinstance(labels, list) or not labels:
-        check(dry, False, "", f"{probe} 라벨 목록을 못 읽는다 ({status}) — 리포/초대 확인")
-        return
-    current = labels[0]
-    # 같은 값으로 PATCH: 상태를 바꾸지 않고 권한만 묻는다.
-    body = {k: current[k] for k in ("name", "color", "description") if k in current}
-    status, err = gh_api(token, "PATCH", f"/repos/{probe}/labels/{current['name']}", body)
+    writable, missing = [], []
+    for repo in repos:
+        status, info = gh_api(token, "GET", f"/repos/{repo}")
+        if status == 200 and (info or {}).get("permissions", {}).get("push"):
+            writable.append(repo)
+        elif status == 200:
+            # public 이라 읽기는 되지만 collaborator 가 아니다.
+            missing.append((repo, "초대 안 됨 (읽기만 된다)"))
+        elif status == 404:
+            missing.append((repo, "리포가 없거나 private 이고 초대 안 됨 (404)"))
+        else:
+            missing.append((repo, f"닿지 않음 ({status})"))
+
+    if writable:
+        # 한 집에서 무변경 PATCH 로 라벨 쓰기를 실제로 확인한다. push=true 가
+        # 곧 이슈 쓰기라는 추론에 기대지 않는다 — 토큰 스코프가 좁으면
+        # push 권한이 있어도 거부될 수 있다.
+        probe = writable[0]
+        status, labels = gh_api(token, "GET", f"/repos/{probe}/labels?per_page=1")
+        if status == 200 and isinstance(labels, list) and labels:
+            current = labels[0]
+            body = {k: current[k] for k in ("name", "color", "description") if k in current}
+            status, err = gh_api(token, "PATCH", f"/repos/{probe}/labels/{current['name']}", body)
+            check(
+                dry,
+                status == 200,
+                f"{probe} 라벨 쓰기 가능 (무변경 PATCH 200)",
+                f"{probe} 라벨 쓰기 거부 ({status} {(err or {}).get('message', '')}) — "
+                f"{BOT_LOGIN} 의 토큰이 classic + `public_repo` 인지 확인해라",
+            )
+        else:
+            check(dry, False, "", f"{probe} 라벨 목록을 못 읽는다 ({status})")
+
+    for repo, why in missing:
+        print(f"   · 제외 {repo} — {why}")
     check(
         dry,
-        status == 200,
-        f"{probe} 라벨 쓰기 가능 (무변경 PATCH 200)",
-        f"{probe} 라벨 쓰기 거부 ({status} {(err or {}).get('message', '')}) — "
-        f"fine-grained PAT 는 남의 소유 리포에 쓸 수 없다. {BOT_LOGIN} 으로 로그인해 "
-        f"classic token(scope: public_repo 하나)을 만들고 `pass insert {PASS_PAT_BOT}` 로 덮어써라",
+        bool(writable),
+        f"봇이 쓸 수 있는 집 {len(writable)}/{len(repos)} → {','.join(writable)}",
+        f"{BOT_LOGIN} 이 쓸 수 있는 집이 대장 대상 {len(repos)}곳 중 하나도 없다 — collaborator 초대부터 해라",
     )
+    return writable
+
+
+FORWARDER_HOOK_HOST = "webhook-forwarder.github.com"
+
+
+def forwarder_hooks(token, repo):
+    """그 리포에 남아 있는 `gh webhook forward` relay 훅의 id 들.
+
+    forward 는 리포에 훅을 만들고 프로세스가 죽어도 남긴다. 남은 훅은 다음
+    `on` 을 `422 Hook already exists` 로 즉사시키고, 배달은 아무도 안 받는
+    relay 로 흘러간다. URL 호스트로만 골라낸다 — 사람이 만든 훅은 절대
+    건드리지 않는다.
+    """
+    status, hooks = gh_api(token, "GET", f"/repos/{repo}/hooks")
+    if status != 200 or not isinstance(hooks, list):
+        return []
+    return [h["id"] for h in hooks if FORWARDER_HOOK_HOST in str((h.get("config") or {}).get("url", ""))]
+
 
 
 def check(dry, cond, ok_msg, fail_msg):
@@ -441,8 +488,13 @@ def _on_steps(dry):
     print("\n4) 대장 → allowlist 유도 (board.ledger_houses() 재사용)")
     # board.py 가 대장을 못 읽으면 여기서 sys.exit 로 바로 멈춘다 — 빈 대장을
     # "빚 0" 처럼 조용히 삼키지 않는 것이 board.py 의 규율이고, 여기서도 그대로다.
-    allow_repos = allowlist_repos()
-    check(dry, len(allow_repos) > 0, f"배정 {len(allow_repos)}집 → {','.join(allow_repos)}", "대장에 배정된 리포가 없다 — LEDGER.md 확인")
+    ledger_repos = allowlist_repos()
+    check(dry, len(ledger_repos) > 0, f"배정 {len(ledger_repos)}집 → {','.join(ledger_repos)}", "대장에 배정된 리포가 없다 — LEDGER.md 확인")
+    # 대장은 대상을 정하고, 봇 토큰은 그중 닿을 수 있는 곳을 정한다. allowlist
+    # 는 둘의 교집합이어야 한다 — 초대 안 된 집을 남기면 그 집 이슈마다 턴이
+    # 열려 404 로 죽는다.
+    bot_token = attempt(dry, f"pass {PASS_PAT_BOT} 읽기", lambda: pass_show(PASS_PAT_BOT))
+    allow_repos = bot_writable_repos(dry, bot_token, ledger_repos) if bot_token else ledger_repos
 
     print("\n5) 경로 확보 (절대경로 — 상대경로면 worktree pool 이 cwd 기준으로 풀려 깨진다)")
     workspace_root = DATA_DIR / "workspaces"
@@ -498,13 +550,10 @@ def _on_steps(dry):
         print(f"   ✓ 썼다: {ROBOMP_ENV} (0600)")
 
     print("\n7) 설정 파일: " + str(PROXY_ENV))
-    token = attempt(dry, f"pass {PASS_PAT_BOT} 읽기", lambda: pass_show(PASS_PAT_BOT))
-    if token:
-        bot_token_check(dry, token, allow_repos)
     if dry:
-        print(f"   [dry-run] {PROXY_ENV} 쓰지 않음 (0600, GITHUB_TOKEN 하나만 담을 것)")
+        print(f"   [dry-run] {PROXY_ENV} 쓰지 않음 (0600, GITHUB_TOKEN 하나만 담을 것 — 4) 에서 이미 읽고 점검했다)")
     else:
-        write_env_file(PROXY_ENV, {"GITHUB_TOKEN": token})
+        write_env_file(PROXY_ENV, {"GITHUB_TOKEN": bot_token})
         print(f"   ✓ 썼다: {PROXY_ENV} (0600, GITHUB_TOKEN 하나)")
 
     print("\n8) 포트 확인")
@@ -546,6 +595,18 @@ def _on_steps(dry):
 
     print(f"\n11) gh webhook forward ({len(allow_repos)}개 리포, --events=issues)")
     classic_pat = attempt(dry, f"pass {PASS_PAT_CLASSIC} 읽기 (admin:repo_hook, forward 전용)", lambda: pass_show(PASS_PAT_CLASSIC))
+    for repo in allow_repos:
+        stale = forwarder_hooks(classic_pat, repo) if classic_pat else []
+        for hook_id in stale:
+            # `gh webhook forward` 는 repo 에 relay 훅을 만들고, 프로세스가
+            # 죽어도 그 훅을 남긴다. 다음 `on` 은 그걸 보고
+            # `422 Hook already exists` 로 즉사한다 — 켜기 전에 우리가 만든
+            # 훅만 지운다(다른 훅은 건드리지 않는다).
+            print(f"   {'지울 것' if dry else '지운다'}: {repo} 의 남은 forwarder 훅 {hook_id}")
+            if not dry:
+                status, _ = gh_api(classic_pat, "DELETE", f"/repos/{repo}/hooks/{hook_id}")
+                if status not in (204, 404):
+                    raise Halt(f"{repo} forwarder 훅 {hook_id} 삭제 실패 ({status})")
     for repo in allow_repos:
         name = forward_name(repo)
         fwd_log = LOG_DIR / f"{name}.log"
@@ -625,8 +686,22 @@ def cmd_off(_args):
         print("    ✓ 내렸다")
         pidfile_path(name).unlink(missing_ok=True)
 
+    # 프로세스를 내려도 GitHub 쪽 relay 훅은 남는다. 남기면 배달이 아무도
+    # 안 받는 곳으로 흐르고, 다음 `on` 은 `422 Hook already exists` 로 죽는다.
+    if repos:
+        try:
+            classic_pat = pass_show(PASS_PAT_CLASSIC)
+        except RuntimeError as exc:
+            print(f"  · relay 훅 정리 못 함 — {exc}")
+        else:
+            for repo in repos:
+                for hook_id in forwarder_hooks(classic_pat, repo):
+                    status, _ = gh_api(classic_pat, "DELETE", f"/repos/{repo}/hooks/{hook_id}")
+                    mark = "✓" if status in (204, 404) else f"✗({status})"
+                    print(f"  {mark} {repo} relay 훅 {hook_id} 삭제")
+
     if not any_running:
-        print("  이미 꺼져 있다.")
+        print("  프로세스는 이미 꺼져 있었다.")
 
 
 # ── main ─────────────────────────────────────────────────────────────────
