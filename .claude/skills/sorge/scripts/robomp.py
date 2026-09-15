@@ -458,7 +458,7 @@ def cmd_allowlist(_args):
 # ── on ───────────────────────────────────────────────────────────────────
 
 
-def _on_steps(dry):
+def _on_steps(dry, only=""):
     root = omp_root()
     robomp_src = root / "python" / "robomp"
     omprpc_src = root / "python" / "omp-rpc"
@@ -510,6 +510,23 @@ def _on_steps(dry):
     # 열려 404 로 죽는다.
     bot_token = attempt(dry, f"pass {PASS_PAT_BOT} read", lambda: pass_show(PASS_PAT_BOT))
     allow_repos = bot_writable_repos(dry, bot_token, ledger_repos) if bot_token else ledger_repos
+
+    # 좁은 시작. 대장은 그대로 두고 **이번 기동만** 몇 집으로 줄인다 — 새 모델과
+    # 호흡을 맞추는 첫 시간에 열다섯 집이 동시에 노출되지 않게 (GLG, 2026-09-15:
+    # "간단한 시작을 맡겨봐야하는데 … 일반적인 스위퍼하는 역할부터").
+    # 대장을 고치는 것이 아니므로 다음 `on` 은 다시 전부가 기본이다.
+    if only:
+        wanted = {o.strip() for o in only.split(",") if o.strip()}
+        picked = [r for r in allow_repos if r in wanted or r.split("/")[-1] in wanted]
+        unknown = sorted(wanted - set(picked) - {r.split("/")[-1] for r in picked})
+        if unknown:
+            raise Halt(
+                f"--only names repos that are not reachable targets: {', '.join(unknown)}\n"
+                f"     reachable right now: {', '.join(allow_repos)}"
+            )
+        print(f"   --only → narrowed this start to {len(picked)}/{len(allow_repos)}: {','.join(picked)}")
+        print("     (the ledger is untouched — the next `on` without --only is all of them again)")
+        allow_repos = picked
 
     print("\n5) resolve paths (absolute — relative paths break because the worktree pool resolves them against cwd)")
     workspace_root = DATA_DIR / "workspaces"
@@ -666,7 +683,7 @@ def cmd_on(args):
     dry = not args.go
     print(f"━━ sorge robomp · on · {'dry-run (add --go to actually run)' if dry else 'run'} ━━\n")
     try:
-        _on_steps(dry)
+        _on_steps(dry, getattr(args, "only", "") or "")
     except Halt as exc:
         print(f"\nhalted: {exc}")
         sys.exit(1)
@@ -768,6 +785,12 @@ def main():
     sub.add_parser("allowlist", help="LEDGER.md-assigned repos → owner/repo list (reuses board.ledger_houses)")
     p_on = sub.add_parser("on", help="turns on in order: venv → env file → gh-proxy → orchestrator → webhook forward")
     p_on.add_argument("--go", action="store_true", help="actually turn it on (default is dry-run — prints the plan only, no side effects)")
+    p_on.add_argument(
+        "--only",
+        default="",
+        metavar="REPO[,REPO]",
+        help="narrow THIS start to a few repos (ledger stays untouched; short names ok, e.g. --only sorge)",
+    )
     sub.add_parser("off", help="gracefully stops everything by pidfile (SIGTERM → check → SIGKILL)")
     p_judge = sub.add_parser("judge", help="manually queue one issue for judging (doesn't wait for a webhook)")
     p_judge.add_argument("ref", help="owner/repo#NN — must be a ledger target and inside the allowlist")

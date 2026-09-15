@@ -148,6 +148,7 @@ show_menu() {
     echo "    5) status — proxy/orchestrator/forwarders, model, allowlist"
     echo "    6) on (dry-run — prints what it would do)"
     echo "    7) on --go (venv → env → proxy → orchestrator → forwarders)"
+    echo "    N) on --go, narrowed to one repo (while a new model settles in)"
     echo "    8) off (stop everything, delete relay hooks)"
     echo "    9) judge one issue by hand (owner/repo#NN)"
     echo ""
@@ -190,6 +191,7 @@ Issue loop — stock RobOMP, no fork patches:
   ./run.sh robomp status              proxy/orchestrator/forwarder liveness, model, allowlist, recent events
   ./run.sh robomp allowlist           ledger-assigned repos → owner/repo (reuses ledger_houses)
   ./run.sh robomp on [--go]           venv → env → gh-proxy → orchestrator → forwarders (dry-run by default)
+  ./run.sh robomp on --go --only sorge   same, narrowed to a few repos for this start only (ledger untouched)
   ./run.sh robomp off                 stop everything by pidfile, delete relay hooks
   ./run.sh robomp judge owner/repo#NN  queue one issue by hand, no webhook needed
 
@@ -229,6 +231,7 @@ main() {
             5) board_robomp status ;;
             6) board_robomp on ;;
             7) board_robomp on --go ;;
+            N) read -rp "repo(s), comma-separated (e.g. sorge): " r; [[ -n "$r" ]] && board_robomp on --go --only "$r" ;;
             8) board_robomp off ;;
             9) read -rp "issue ref (owner/repo#NN): " ref; [[ -n "$ref" ]] && board_robomp judge "$ref" ;;
             b) board_start ;;
