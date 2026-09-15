@@ -1,144 +1,139 @@
-# NEXT — robomp 라벨 스위퍼 인계 (2026-09-15, Claude Code / claude-opus-5)
+# NEXT — robomp 이슈 루프 인계 (2026-09-15 갱신, Claude Code / claude-opus-5)
 
-GLG 판정으로 **방향이 바뀌었다.** 아래는 오늘 만든 것 전부와, 왜 그것이 GLG가 원하는
-모양이 아닌지, 그리고 다음 사람이 무엇을 다시 재야 하는지다.
+**이 문서는 두 번 쓰였다.** 오전판은 「`sorge-label` 프로파일을 fork 에 얹고 fresh
+라벨 봇을 만든다」였고, **오후에 GLG 가 그 전제를 폐기했다.** 오전판의 계획 절은
+전부 무효다 — 실측 사실만 살아남았고 그건 아래에 남겼다.
 
-## GLG의 새 요구 (2026-09-15, 이 문서가 쓰인 이유)
+## GLG 판정 (2026-09-15 오후)
 
-세 문장이 전부다.
+> omp 를 수정하면 안돼. 그냥 써야돼. **그래야 omp 버전업을 할수가 있거든.**
+> 그냥 omp robocomp 에서 제공하는 방식을 맞추자. **bg 도 오케이야.**
+> 일단 만들어서 루프를 돌리게 하려는거야. **시작이 되야 튜닝을 할 수 있으니까.**
+> run.sh 내가 켜고, 상태보고 끄고 가 되야돼.
 
-1. **"bg로 도는 건 내가 원하는 방식이 아니다."** 백그라운드 데몬이 판정을 내면 GLG가
-   그 판정자와 대화할 수 없다. 뒤에서 도는 것은 제한적이다.
-2. **"나는 소넷을 불러서 그 친구가 깨어나서 하는 거야. 그래야 니가 그 친구랑 이야기를
-   하는데."** 원하는 것은 **보이는 형제** — 깨어나서 판정하고, 그 자리에서 대화 가능한
-   시민. entwurf가 이미 그 축을 든다(`entwurf_fresh_call` → 보이는 창).
-3. **"omp 수정하는 것도 별로야. 유지보수하기 힘들어."** 상류(can1357/oh-my-pi)에서
-   갈라진 fork를 계속 리베이스하며 사는 것이 부담이다. **"우리가 문을 열어놨으니까 pi
-   에서 뭔가 익스텐션으로 처리가 간단하게 될지도 몰라."**
+무게는 「유지보수」가 아니라 **버전업**에 있다. fork 에 우리 줄이 있으면 상류를
+따라갈 수 없고, 그때 잃는 것(계속 자라는 하네스)이 얻는 것(좁은 봇)보다 크다.
 
-따라서 지금 서 있는 물건은 **작동하지만 채택되지 않은 선례**다. 지우지 않고, 무엇이
-값이었고 무엇이 비용이었는지 남긴다.
+## 지금 상태
 
-## 지금 상태 — 꺼져 있다
+- **꺼져 있다.** `./run.sh robomp status` 로 확인. relay 훅 잔존 0
+- **fork 는 상류와 동일하다.** `junghan0611/oh-my-pi` main = `f97fa5c`, 로컬 전용
+  커밋 0. `git pull upstream main` 이 되고 현재 상류가 747줄 앞서 있다
+- **폐기한 1,188줄은 곁가지에 있다** — `junghan0611/oh-my-pi@sorge-label-profile`.
+  지우지 않은 이유는 그 판정이 틀려서가 아니라 아직 필요해지지 않아서다
+- **우리 것은 손잡이 하나뿐** — `sorge@10f4a69`,
+  `.claude/skills/sorge/scripts/robomp.py`
 
-`./run.sh robomp off` 를 돌렸다. gh-proxy·orchestrator·forward 15개 전부 내렸고,
-**GitHub 쪽 relay 훅 15개도 삭제**했다(남기면 배달이 아무도 안 받는 곳으로 흐르고 다음
-`on` 이 422로 죽는다). 설정 파일(`~/.config/sorge/robomp*.env`, 0600)과 데이터
-(`~/.local/share/sorge/robomp/`)는 남아 있다. `./run.sh robomp on --go` 한 번으로 되살아난다.
+## 켜고 보고 끄기
 
-## 오늘 실제로 작동한 것 (측정, oracle 호스트)
-
-### 전 구간이 돌았다
-```
-issues.opened(junghan0611/sorge#24)
-  → gh webhook forward → POST /webhook/github 202 (HMAC 검증)
-  → SQLite delivery dedup → issue별 직렬 큐
-  → git worktree farm/82f4aee8/… → fresh omp --mode rpc (sonnet-4-6, thinking=high)
-  → fetch_issue_thread → set_issue_labels → rpc_done   (43초)
-라벨: house:sorge · ball:glg · priority:important-not-urgent   댓글 0 커밋 0
-봇 라벨의 되돌아온 웹훅 3건 → skip reason=issues.labeled caused by self
+```bash
+cd ~/repos/gh/sorge
+./run.sh robomp on          # dry-run — 무엇을 할지만 찍는다
+./run.sh robomp on --go     # venv → env 파일 → gh-proxy → orchestrator → 훅 15개
+./run.sh robomp status      # 포트·프로파일·모델·키·allowlist·훅 15줄
+./run.sh robomp off         # SIGTERM → SIGKILL + relay 훅 삭제
+./run.sh robomp judge owner/repo#NN   # 웹훅 없이 한 건만 큐에 넣는다
 ```
 
-### 손으로도 돈다
-`./run.sh robomp judge junghan0611/sorge#19` → `sorge-bot` 이
-`house:sorge` + `house:agent-config` + `house:andenken` + `ball:sorge` + `priority:` 를 달았다.
-**횡단 몫 셋을 정확히 짚었다**(그 이슈 제목이 "기억축 활용성 인터뷰 —
-agent-config·andenken·OpenClaw"). `state:` 는 붙이지 않았다 — 아직 아무 일도 시작되지
-않았으니 없는 것이 맞다.
+`DEEPSEEK_API_KEY` 가 셸에 없으면 `on` 이 사유를 대고 멈춘다(자식이 격리 XDG 라
+호스트 구독을 못 본다 — 아래 §자격증명).
 
-### 봇 계정
-`sorge-bot`, classic PAT + `public_repo` 스코프 하나(`pass api/github/sorge-bot/pat`).
-대장 대상 **15/15** 집에 Write collaborator 로 초대·수락 완료. 무변경 PATCH 200 으로
-라벨 쓰기 실제 확인.
+## 손잡이가 정하는 것은 셋뿐
 
-## 다음 사람이 알아야 할 실측 사실 (여기가 이 문서의 값이다)
+**allowlist**(`board.ledger_houses()` 그대로, 대장 15집) · **모델** · **봇 이름**.
+나머지 동작은 **stock 기본값에 맡긴다** — 값을 적는 순간 그것이 관리 대상이 되고,
+버전업 때 기본값 변화를 못 따라간다.
 
-### 토큰
-- **fine-grained PAT 는 발급 계정이 소유하지 않은 리포에 쓸 수 없다.** Write
-  collaborator 여도 `403 Resource not accessible by personal access token`. 남의 리포에
-  라벨을 쓰려면 **classic + `public_repo`** 여야 한다. 대상 15집 전부 public 이라 이
-  스코프로 충분하다.
-- 읽기는 신호가 아니다 — public 리포는 토큰 없이도 200 이다. **쓰기만 신호다.**
-  무변경 PATCH(같은 값으로 라벨 수정) 한 번이 비파괴 권한 테스트다.
-- `gh webhook forward` 는 `admin:repo_hook` 이 필요해 GLG 의 classic 토큰
-  (`pass api/github/junghan0611/forge/pat`)을 쓴다. 봇 토큰과 섞지 않는다.
-- `pass api/anthropic/junghanacs` **API 키는 죽어 있다(401)**.
+예외 하나만 뒀다: `ROBOMP_QUESTION_AUTOCLOSE_ENABLED=false`. 무인으로 GLG 의
+이슈를 닫는 것은 stock 기본값이어도 받지 않는다.
 
-### 모델 자격증명 (pi/omp 공통 함정)
-자식 omp 프로세스에 workspace별 격리 XDG 를 주면, **`XDG_DATA_HOME` 이 설정된 순간
-`PI_CODING_AGENT_DIR` 오버라이드가 자격증명 저장소에 대해 무시된다.** 자식은
-`$XDG_DATA_HOME/omp/agent.db` 를 보고 "No API key found for anthropic" 로 죽는다.
-호스트 `~/.omp/agent/agent.db` 를 그 자리에 **심링크**하면 세션·blob·캐시 격리는
-유지한 채 GLG 구독 자격으로 sonnet 이 돈다. 이것이 죽은 API 키를 우회한 유일한 길이었다.
+## 라이브 증거 — `sorge#25` (fork diff 0 줄)
+
+```text
+issues.opened(#25) → POST /webhook/github (HMAC 202)
+  → INSERT OR IGNORE delivery dedup → claim
+  → worktree farm/b9da13da/care-sorge-stock-full-agents
+  → rpc_model_pick deepseek/deepseek-v4-pro thinking=high (resuming=False)
+  → read / gh_search_issues ×2 / fetch_issue_thread
+  → classify_issue → gh_post_comment → rpc_done (messages=4)
+```
+
+라벨 `question`,`triaged` + sorge-bot 댓글 1개. 판정 내용도 맞았다. 코드 수정·PR 은
+사건이 요구하지 않아 하지 않았다. `on → status → off` 3박자 확인.
+
+## 실측 사실 — 이 문서의 값은 여기다
+
+### 자격증명 (pi/omp 공통 함정)
+
+stock `robomp` 에는 **`agent_dir` 설정이 아예 없다.** 자식 omp 는 격리 XDG 로 뜨고
+호스트 구독(`~/.omp/agent/agent.db`)을 못 본다. 오전에 이걸 symlink 로 이으려고
+fork 를 고쳤는데, **모델을 바꾸면 코드가 필요 없다** — scrub 목록
+(`worker.py:127-134`)은 `GITHUB_TOKEN`·`GITHUB_WEBHOOK_SECRET`·
+`ROBOMP_REPLAY_TOKEN`·`ROBOMP_GH_PROXY_HMAC_KEY` 넷뿐이라 provider 키는 자식까지
+전달된다.
+
+2026-09-15 키 실측: **anthropic 401 · openai 401 · deepseek 200 · gemini 200.**
+그리고 `XDG_DATA_HOME` 이 설정되면 omp 는 `PI_CODING_AGENT_DIR` 대신
+`$XDG_DATA_HOME/omp/agent.db` 를 본다 — 이 우선순위가 오전의 함정이었다.
+
+### 토큰 두 개, 역할이 다르다
+
+- **`api/github/sorge-bot/pat`** (classic, `public_repo`) — 판정이 쓰는 것. 이슈·
+  라벨·댓글·PR. fine-grained 는 **소유하지 않은 리포에 권한을 못 준다**(403
+  `Resource not accessible by personal access token`) — collaborator 로 초대돼도
+  그렇다. 그래서 classic 이다
+- **`api/github/junghan0611/forge/pat`** (classic, `admin:repo_hook`) — `gh webhook
+  forward` 전용. 훅 등록은 리포 소유자 권한이라 봇이 못 한다. **이 분리가 맞다**
 
 ### 도커 전용 가정이 호스트 배치에서 드러난 자리
-- `ROBOMP_WORKSPACE_ROOT`/`SQLITE_PATH`/`LOG_DIR`/`NATIVES_CACHE_ROOT` 는 **절대경로**
-  여야 한다. 상대경로면 `git worktree add` 가 pool cwd 기준으로 풀려
-  `fatal: already exists` 로 죽는다.
-- `robomp serve` 는 `GITHUB_TOKEN` 이 환경에 보이면 **시작을 거부한다**
-  (`python/robomp/src/server.py:261`). PAT 는 gh-proxy 사이드카만 든다 → 항상 2프로세스.
-- `gh webhook forward` 는 리포에 relay 훅을 만들고 프로세스가 죽어도 남긴다.
-- 리포 안 `python/robomp/.env` 를 두면 `Settings` 테스트 4건이 그 값을 읽어 깨진다.
+
+RobOMP 는 도커 태생이라 `./data/...` 상대경로 기본값을 쓴다. 호스트에서는 `/data`
+를 만들려 해 `PermissionError` 로 즉사한다 — 손잡이가 전부 절대경로로 덮는다
+(`~/.local/share/sorge/robomp/...`). `gh-proxy` 는 `GITHUB_TOKEN` 을 들고,
+orchestrator 는 **그 키가 env 에 있으면 기동을 거부한다**(`SystemExit`) — 그래서
+env 파일이 둘이다.
 
 ### 라우팅
-`route()` 가 사건을 통과시켜도 dispatcher 에 분기가 없으면 `no-op dispatch` 로 조용히
-사라진다(`issues.labeled|edited` 가 그랬다). **"깨운다"를 라우팅으로 결론내지 말고
-`rpc_start` 까지 로그로 확인해야 한다.**
 
-## 무엇이 값이었고 무엇이 과했나
+`issues.opened|reopened` 만 triage 를 깨운다. `labeled`/`edited` 는
+`skip reason=issues.labeled ignored` — **자기깨움 루프가 구조적으로 없다.** 댓글·
+PR 자기사건은 stock 이 이미 막는다(`github_events.py:346,202`). stock 에 이슈 생성
+도구가 없으므로(`gh_post_comment`·`gh_push_branch`·`gh_open_pr`·`gh_request_review`·
+`gh_search_issues` 뿐) 봇이 이슈를 만들 수도 없다.
 
-라벨 판정 턴이 실제로 쓴 도구는 **`fetch_issue_thread` + `set_issue_labels` 둘뿐**이고
-리포 체크아웃은 한 줄도 읽지 않았다. 그런데 RobOMP 는 그 두 번을 위해 매번 워크트리를
-파고 의존성까지 깔았다. **라벨만이면 과한 도구다.**
+## 튜닝 대기 — 루프가 도는 뒤에 잰다
 
-RobOMP 가 값을 내는 자리는 그 다음이다 — 같은 날 시험 리포(`junghan0611/robomp-lab`)에서
-stock 프로파일은 이슈 하나를 받아 분류→라벨→댓글→브랜치 푸시→**PR #2** 까지 갔다.
-delivery 기준 중복 제거 · issue별 직렬 큐 · 백오프 재시도(3회째에 살아난 사건 있음) ·
-사건별 워크트리 격리 · host tool 감사 경계 · orchestrator 가 PAT 를 아예 못 보는 구조가
-그 능력을 받친다. 그건 GitHub Actions 한 스텝으로 만들 수 없다.
+1. **넓은 프로파일의 대가.** stock 은 댓글·브랜치·PR 까지 간다. 어디서 과했는지는
+   라이브 사건이 모여야 안다. **좁히는 수단은 fork 가 아니라 프롬프트·라벨 규약·
+   이슈 본문이어야 한다**
+2. **사건 유실.** `gh webhook forward` 는 relay 훅 + 로컬 리스너다. 호스트가 꺼진
+   동안의 사건은 잃고, **잃은 것을 모른다**(`sorge#24`). polling + 커서는 자동으로
+   따라잡는다 — 재볼 후보
+3. **one live judge.** 지금 세는 것은 in-process `_inflight`. 재기동 뒤 살아 있는
+   judge 를 알아보는 방법이 없다
+4. **보이는 창.** bg 를 받아들였으므로 지금은 창이 없다. 대화면이 필요해지면
+   `entwurf_fresh_call` 이 그 자리다 — 그때도 권위는 라벨과 대장이고 창은 대화면일
+   뿐이다
 
-**그러나 GLG 가 원하는 것은 그 능력이 아니었다.** 원하는 것은 대화 가능한 보이는 형제다.
-그 축에서 보면 RobOMP 의 강점(견고한 무인 큐)은 바로 약점이다 — 무인이라 대화면이 없다.
+## 코드가 사는 곳
 
-## 다음 사람이 재봐야 할 것 — pi 익스텐션 방향
-
-GLG 가 가리킨 방향: **pi 쪽 익스텐션으로 간단히 될지도 모른다.**
-
-재볼 것:
-1. pi 익스텐션/훅(`--hook`, `-e/--extension`)이 **외부 사건으로 턴을 깨울 수 있는가**,
-   아니면 이미 도는 세션 안에서만 사는가. 후자라면 사건 수신은 여전히 밖에 있어야 한다.
-2. 사건 수신을 가장 얇게 만드는 법. GitHub 이슈 웹훅을 받는 최소 표면은 무엇이고, 그것이
-   **보이는 형제를 깨우는 것**(`entwurf_fresh_call`)으로 바로 이어질 수 있는가.
-   entwurf 는 이미 "보이는 창 + 콜백 + garden id" 를 든다 — 사건 → `entwurf_fresh_call` →
-   그 창에서 판정 → GLG 가 그 창과 대화. 이 모양이 GLG 요구와 정확히 맞는다.
-3. 그러면 남는 질문은 **누가 웹훅을 받아 entwurf 를 호출하는가** 하나로 줄어든다.
-   RobOMP 전체(HMAC·dedup·큐·워크트리·RPC)가 아니라 그 앞단 한 조각만 필요하다.
-4. **fork 유지보수 비용을 지지 않는 배치**여야 한다. 오늘 fork 에 넣은 것은
-   `sorge-label` 프로파일(env 게이트 뒤, `full` 무회귀)이지만, 상류와 갈라진 축이
-   하나 늘어난 것은 사실이다.
-
-## 코드가 사는 곳 (전부 main 에 푸시됨)
-
-| 자리 | 커밋 | 내용 |
+| 리포 | 커밋 | 무엇 |
 |---|---|---|
-| `junghan0611/oh-my-pi` (fork, remote `glg`) | `6519adb` `84a2766` | 봇 작성 이슈 skip 복구 + `sorge-label` 프로파일(fresh 턴·도구 넷·self-wake 차단·coalescing·`ROBOMP_AGENT_DIR`) |
-| `junghan0611/sorge` | `21b606d` `52f15e3` | `.claude/skills/sorge/scripts/robomp.py` — `on/off/status/allowlist/judge` |
-| `junghan0611/agent-config` | `6914286` | `OMP.md` 2026-09-15 절 — 도입 profile·activation 조건·운영 receipt |
-| 담당자 문서 `20260227T031800` | — | 현재 보고 + `:noexport:` 절차(함정 6건 포함) |
-
-검증: robomp 스위트 716 passed(유일 실패 `test_run_git_kills_hung_child` 는 우리 커밋이
-건드리지 않은 기존 flake) · ruff clean.
+| `junghan0611/sorge` | `10f4a69` | 손잡이를 stock 에 맞췄다 (프로파일 env 제거, deepseek, 키 점검) |
+| `junghan0611/oh-my-pi` | `f97fa5c` = 상류 | **수정 없음.** 폐기분은 곁가지 `sorge-label-profile` |
+| `junghan0611/agent-config` | `6914286` | OMP.md 운영 receipt (RobOMP 소스 사본 없음) |
 
 ## 열려 있는 이슈
 
-- `sorge#22` — autopilot(memento). 이 일의 본줄. `state:ready` `ball:sorge`.
-- `sorge#23` — 봇 계정 도입과 초대 확장 (초대는 15/15 완료됨, 문서 갱신 필요)
-- `sorge#24` — 공개 webhook ingress 없이 이 호스트가 꺼지면 사건도 끊긴다
+- **`sorge#22`** — 이 판정으로 본문 전면 재작성됨. 정본은 거기다
+- **`sorge#23`·`#24`** — 오전 라이브 사건 둘. `#24` 가 사건 유실 자리에 서 있다
+- **`sorge#25`** — stock full 첫 사건. 이 인계의 증거
+- **`sorge#19`** — 기억축 인터뷰. `judge` 로 손수 큐에 넣어 답이 달렸다
 
 ## 건드리지 말 것
 
-- 대장 파싱을 다시 구현하는 것 — `board.ledger_houses()` 하나뿐이다.
-- `sorge-label` 프로파일에 댓글·PR·push·`entwurf_fresh_call` 도구를 넣는 것.
-  `LOOP.md § 착수 조건` 의 열 조건 게이트 없이 그것을 넣으면 **이슈 본문이 곧 실행
-  권한**이 된다 — 프롬프트 인젝션의 문이다.
-- 비밀값을 리포 안 파일에 쓰는 것. `pass` → 0600 env 파일만.
+- **fork 에 줄을 넣는 것.** 좁히고 싶으면 프롬프트·라벨 규약·이슈 본문으로 한다.
+  fork 를 고치는 순간 버전업이 막힌다 — 그게 이 판정의 전부다
+- **손잡이에 stock 설정값을 더 적는 것.** 기본값에 맡긴 것은 일부러 맡긴 것이다
+- **`board.ledger_houses()` 를 우회한 allowlist.** 대장 파싱은 한 곳에만 있다
+- **PAT 를 문서·repo·transcript 에 넣는 것.** password store 에만 둔다
