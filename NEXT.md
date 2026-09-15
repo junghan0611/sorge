@@ -18,7 +18,8 @@
 
 - **Current:** 이슈판이 섰고 두 집(sorge·agent-config)이 같은 판을 본다.
   **숫자는 여기 적지 않는다** — `./run.sh board` 가 매번 유도한다(파생 저장 금지, terra 2차 P2)
-- **Next:** (1) **stock 루프를 켜 두고 sorge-bot 이 기본을 하는지 본다**(`./run.sh robomp on --go`).
+- **Next:** (1) **`sorge#28` 결정을 GLG 에게 받는다** — 그 전엔 루프를 켜지 않는다.
+  받으면 `sorge` 한 집(`--only`)으로 다시 켜고 sorge-bot 이 기본을 하는지 본다.
   안정되면 넓힌다 — 좁히는 수단은 fork 가 아니라 프롬프트·라벨 규약·이슈 본문이다
   → (2) **버전업 리허설을 별도 워크트리에서 한다** — `upstream/main` 이 `6f2c14b3`,
   우리 `f97fa5c` 보다 **22,413 커밋 앞**이다(terra 실측). `pull` + venv deps 재설치가
@@ -27,7 +28,10 @@
   → (3) `v2026.9.8` 태그/릴리즈 정합 판정을 GLG 에게 받는다(백필 vs 절 정정)
   → (4) `board` 가 띄우는 세 경고를 그 집들에 넘긴다 — `entwurf#78`(자리 없음) ·
   `doomemacs-config#11`(receipt 없음) · `entwurf#110`(라벨 없는 워크트리)
-- **Blocker:** 없음
+- **Blocker:** **`sorge#28`** — public 이슈가 GLG 권한 턴을 깨운다. 슬롯 uid 격리는
+  root 로만 켜지고(`queue.py:46-54`) 우리는 uid 1000 으로 떴다. 작성자 게이트도 없다
+  (`github_events.py:322-341`). **루프는 내렸고 15집 확장은 보류다** — ingress·격리
+  topology·secret transport 셋이 GLG 결정을 기다린다 (terra 독립 판독 동의)
 - **Read:** `AGENTS.md`(자리) · `LOOP.md`(계약) · `labels.py` 헤더(라벨이 왜 그 모양인가) ·
   운전법은 담당자 문서 `denote:20260227T031800` §절차
 - **Do not touch:**
