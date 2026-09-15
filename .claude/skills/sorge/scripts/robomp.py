@@ -62,9 +62,12 @@ PROXY_PORT = 8081
 DEFAULT_OMP_ROOT = HOME / "repos" / "3rd" / "pi" / "oh-my-pi"
 DEFAULT_AGENT_DIR = HOME / ".omp" / "agent"
 
-# fine-grained: orchestrator/gh-proxy 가 매일 쓰는 것. classic: `gh webhook
-# forward` 만 (admin:repo_hook 스코프가 거기에만 있다).
-PASS_PAT_FINE = "api/github/junghan0611/personal-access-token"
+# 봇 계정 토큰: orchestrator/gh-proxy 가 매일 쓰는 것. 판정은 sorge-bot 이름으로
+# 남아야 하고, 그래야 자기재기동 가드(`ROBOMP_SELF_LOGINS`)가 GLG 가 연 이슈를
+# 삼키지 않는다. classic: `gh webhook forward` 만 (admin:repo_hook 이 거기에만
+# 있고, 후크 등록은 리포 소유자인 GLG 의 권한이다).
+BOT_LOGIN = "sorge-bot"
+PASS_PAT_BOT = "api/github/sorge-bot/pat"
 PASS_PAT_CLASSIC = "api/github/junghan0611/forge/pat"
 
 SECRET_KEYS = {"GITHUB_WEBHOOK_SECRET", "ROBOMP_GH_PROXY_HMAC_KEY", "GITHUB_TOKEN"}
@@ -163,6 +166,75 @@ def pass_show(path):
     if not val:
         raise RuntimeError(f"pass show {path} 가 빈 값을 냈다")
     return val
+
+
+def gh_api(token, method, path, body=None):
+    """GitHub REST 한 번. 토큰은 헤더로만 간다 — argv 에 실으면 같은 사용자의
+    다른 프로세스가 `ps` 로 줍는다."""
+    data = json.dumps(body).encode("utf-8") if body is not None else None
+    req = urllib.request.Request(
+        f"https://api.github.com{path}",
+        data=data,
+        method=method,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": "sorge-robomp",
+            "Content-Type": "application/json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            return resp.status, json.loads(resp.read() or b"null")
+    except urllib.error.HTTPError as exc:
+        try:
+            return exc.code, json.loads(exc.read() or b"null")
+        except ValueError:
+            return exc.code, None
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"GitHub 도달 실패: {exc.reason}") from exc
+
+
+def bot_token_check(dry, token, repos):
+    """봇 토큰이 **그 이름으로 라벨을 쓸 수 있는가** — 비파괴로 묻는다.
+
+    읽기는 신호가 아니다. 대상 리포가 전부 public 이라 토큰이 없어도 200 이
+    나온다. 쓰기만 신호다.
+
+    그리고 여기서 갈리는 것이 하나 있다: fine-grained PAT 는 **발급 계정이
+    소유한** 리포에만 권한을 줄 수 있다. collaborator 로 초대돼 push 권한이
+    있어도 GLG 소유 리포에는 `403 Resource not accessible by personal access
+    token` 이 난다(2026-09-15 실측). 그래서 봇 토큰은 classic + `public_repo`
+    여야 하고, 그 구분이 이 자리에서 드러나야 한다 — 프로세스를 띄운 뒤
+    첫 판정이 403 으로 죽는 것보다 낫다.
+    """
+    status, who = gh_api(token, "GET", "/user")
+    login = (who or {}).get("login") if status == 200 else None
+    check(
+        dry,
+        login == BOT_LOGIN,
+        f"토큰 주인 = {login}",
+        f"토큰 주인이 {login or f'불명({status})'} 이다 — {BOT_LOGIN} 이어야 한다",
+    )
+
+    probe = repos[0]
+    status, labels = gh_api(token, "GET", f"/repos/{probe}/labels?per_page=1")
+    if status != 200 or not isinstance(labels, list) or not labels:
+        check(dry, False, "", f"{probe} 라벨 목록을 못 읽는다 ({status}) — 리포/초대 확인")
+        return
+    current = labels[0]
+    # 같은 값으로 PATCH: 상태를 바꾸지 않고 권한만 묻는다.
+    body = {k: current[k] for k in ("name", "color", "description") if k in current}
+    status, err = gh_api(token, "PATCH", f"/repos/{probe}/labels/{current['name']}", body)
+    check(
+        dry,
+        status == 200,
+        f"{probe} 라벨 쓰기 가능 (무변경 PATCH 200)",
+        f"{probe} 라벨 쓰기 거부 ({status} {(err or {}).get('message', '')}) — "
+        f"fine-grained PAT 는 남의 소유 리포에 쓸 수 없다. {BOT_LOGIN} 으로 로그인해 "
+        f"classic token(scope: public_repo 하나)을 만들고 `pass insert {PASS_PAT_BOT}` 로 덮어써라",
+    )
 
 
 def check(dry, cond, ok_msg, fail_msg):
@@ -390,14 +462,14 @@ def _on_steps(dry):
     print(f"   ROBOMP_GH_PROXY_HMAC_KEY  {'재사용' if 'ROBOMP_GH_PROXY_HMAC_KEY' in existing else '새로 생성'} (값은 안 찍는다)")
     values = {
         "GITHUB_WEBHOOK_SECRET": webhook_secret,
-        "ROBOMP_BOT_LOGIN": OWNER,
+        "ROBOMP_BOT_LOGIN": BOT_LOGIN,
         # config.py 의 orchestrator Settings 는 이 둘을 필수로 요구한다
         # (`git_author_email: str = Field(..., ...)`, 기본값 없음). `sorge-label`
         # 프로파일은 gh_push_branch 를 쓰지 않아 실사용은 안 되지만, Settings()
         # 생성 자체가 이 값 없이는 즉시 실패한다 — 그래서 계약 표엔 없어도 넣는다.
         "ROBOMP_GIT_AUTHOR_NAME": existing.get("ROBOMP_GIT_AUTHOR_NAME", "sorge-robomp"),
         "ROBOMP_GIT_AUTHOR_EMAIL": existing.get("ROBOMP_GIT_AUTHOR_EMAIL", "sorge-robomp@users.noreply.github.com"),
-        "ROBOMP_SELF_LOGINS": OWNER,
+        "ROBOMP_SELF_LOGINS": BOT_LOGIN,
         "ROBOMP_TASK_PROFILE": "sorge-label",
         "ROBOMP_MODEL": "anthropic/claude-sonnet-4-6",
         "ROBOMP_THINKING": "high",
@@ -426,7 +498,9 @@ def _on_steps(dry):
         print(f"   ✓ 썼다: {ROBOMP_ENV} (0600)")
 
     print("\n7) 설정 파일: " + str(PROXY_ENV))
-    token = attempt(dry, f"pass {PASS_PAT_FINE} 읽기", lambda: pass_show(PASS_PAT_FINE))
+    token = attempt(dry, f"pass {PASS_PAT_BOT} 읽기", lambda: pass_show(PASS_PAT_BOT))
+    if token:
+        bot_token_check(dry, token, allow_repos)
     if dry:
         print(f"   [dry-run] {PROXY_ENV} 쓰지 않음 (0600, GITHUB_TOKEN 하나만 담을 것)")
     else:
