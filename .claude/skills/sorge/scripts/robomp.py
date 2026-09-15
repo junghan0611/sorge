@@ -704,6 +704,36 @@ def cmd_off(_args):
         print("  프로세스는 이미 꺼져 있었다.")
 
 
+# ── judge ────────────────────────────────────────────────────────────────
+
+
+def cmd_judge(args):
+    """이슈 하나를 손으로 판정 큐에 넣는다 — 웹훅이 온 것처럼.
+
+    사건을 기다리지 않고 지금 판정을 보고 싶을 때, 그리고 훅이 끊겼던 동안
+    지나간 이슈를 따라잡을 때 쓴다. 판정 자체는 도는 orchestrator 가 한다 —
+    이 명령은 줄에 세우고 빠진다.
+    """
+    print(f"━━ sorge robomp · judge {args.ref} ━━\n")
+    alive, _ = proc_alive("orchestrator")
+    if not alive:
+        print("  ✗ orchestrator 가 안 떠 있다 — `./run.sh robomp on --go` 먼저")
+        sys.exit(1)
+    cfg = parse_env_file(ROBOMP_ENV)
+    if not cfg:
+        print(f"  ✗ {ROBOMP_ENV} 가 없다 — `./run.sh robomp on --go` 먼저")
+        sys.exit(1)
+    env = dict(os.environ)
+    env.update(cfg)
+    env.pop("GITHUB_TOKEN", None)  # orchestrator 쪽 설정이다 — PAT 는 gh-proxy 만 든다
+    pyexe = str(VENV_DIR / "bin" / "python")
+    r = subprocess.run([pyexe, "-m", "robomp", "triage", args.ref], cwd=str(omp_root() / "python" / "robomp"), env=env)
+    if r.returncode != 0:
+        sys.exit(r.returncode)
+    print("\n  ✓ 줄에 세웠다. 로그로 따라가라:")
+    print(f"    tail -f {LOG_DIR / 'orchestrator.log'}")
+
+
 # ── main ─────────────────────────────────────────────────────────────────
 
 
@@ -715,6 +745,8 @@ def main():
     p_on = sub.add_parser("on", help="venv → env 파일 → gh-proxy → orchestrator → webhook forward 순서로 켠다")
     p_on.add_argument("--go", action="store_true", help="실제로 켠다 (기본은 dry-run — 아무 부작용 없이 계획만 찍는다)")
     sub.add_parser("off", help="pidfile 기준으로 전부 정상 종료한다 (SIGTERM → 확인 → SIGKILL)")
+    p_judge = sub.add_parser("judge", help="이슈 하나를 손으로 판정 큐에 넣는다 (웹훅을 기다리지 않는다)")
+    p_judge.add_argument("ref", help="owner/repo#NN — 대장 대상이고 allowlist 안이어야 한다")
     a = ap.parse_args()
 
     if a.cmd == "status":
@@ -725,6 +757,8 @@ def main():
         cmd_on(a)
     elif a.cmd == "off":
         cmd_off(a)
+    elif a.cmd == "judge":
+        cmd_judge(a)
     else:
         ap.print_help()
 
