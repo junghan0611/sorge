@@ -248,9 +248,17 @@ def bot_writable_repos(dry, token, repos):
         # 한 집에서 무변경 PATCH 로 라벨 쓰기를 실제로 확인한다. push=true 가
         # 곧 이슈 쓰기라는 추론에 기대지 않는다 — 토큰 스코프가 좁으면
         # push 권한이 있어도 거부될 수 있다.
+        #
+        # 그러나 **dry-run 은 밖에 쓰지 않는다.** 무변경이라도 PATCH 는 쓰기이고,
+        # GitHub 은 그것을 감사로그에 남긴다. dry-run 의 계약은 「아무것도 안
+        # 바뀐다」이지 「같은 값으로 바뀐다」가 아니다 (terra 검수, 2026-09-15).
         probe = writable[0]
         status, labels = gh_api(token, "GET", f"/repos/{probe}/labels?per_page=1")
-        if status == 200 and isinstance(labels, list) and labels:
+        if status != 200 or not isinstance(labels, list) or not labels:
+            check(dry, False, "", f"{probe} can't read label list ({status})")
+        elif dry:
+            print(f"   [dry-run] would verify label write on {probe} with a no-op PATCH (not sent — dry-run writes nothing)")
+        else:
             current = labels[0]
             body = {k: current[k] for k in ("name", "color", "description") if k in current}
             status, err = gh_api(token, "PATCH", f"/repos/{probe}/labels/{current['name']}", body)
@@ -261,8 +269,6 @@ def bot_writable_repos(dry, token, repos):
                 f"{probe} label write rejected ({status} {(err or {}).get('message', '')}) — "
                 f"check that {BOT_LOGIN}'s token is classic + `public_repo`",
             )
-        else:
-            check(dry, False, "", f"{probe} can't read label list ({status})")
 
     for repo, why in missing:
         print(f"   · excluded {repo} — {why}")
