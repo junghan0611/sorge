@@ -68,7 +68,17 @@ DEFAULT_OMP_ROOT = HOME / "repos" / "3rd" / "pi" / "oh-my-pi"
 # stock robomp 는 agent_dir 을 자식에게 넘기지 않고, 자식은 격리 XDG 로 뜬다.
 # 그래서 여기 있는 것은 반드시 **API 키로 닿는 provider** 여야 한다.
 # 2026-09-15 실측: anthropic 401 · openai 401 · deepseek 200 · gemini 200.
-MODEL = "deepseek/deepseek-v4-pro"
+#
+# GLG 판정(2026-09-15): 첫 스위퍼는 `flash` 로 시작한다. `v4-pro` 로 판정 품질을
+# 한 번 확인했지만(`sorge#25`), 일반 스위퍼 역할을 익히는 동안은 싸고 빠른 쪽이
+# 맞다. 우리 체크아웃 HEAD 가 마침 `deepseek-flash` 의 V4.1 wire 계약을 고친
+# 병합(`f97fa5c`)이라 그 지점이 이미 준비돼 있다.
+#
+# **한 개만 둔다.** `ROBOMP_MODEL` 에 쉼표로 여럿 넣으면 stock 이 태스크마다
+# 무작위로 고르고(`config.py:328`), 그러면 봇이 과했을 때 프로파일 탓인지 모델
+# 탓인지 못 가른다. 이슈별 `@robomp-bot /model <alias>` 프라그마는 풀 안에서만
+# 고르므로 지금은 쓸 수 없다 — 그 대가를 알고 하나로 둔다.
+MODEL = "deepseek/deepseek-flash"
 THINKING = "high"
 PROVIDER_KEY_ENV = "DEEPSEEK_API_KEY"
 
