@@ -1,0 +1,38 @@
+# Actions label lane — sorge-bot face, labels only.
+# Secrets (repo): SORGE_BOT_TOKEN, DEEPSEEK_API_KEY
+# Optional var: DEEPSEEK_MODEL (default deepseek-chat)
+name: label-issue
+
+on:
+  issues:
+    types: [opened, reopened]
+
+permissions:
+  contents: read
+  issues: read
+
+concurrency:
+  group: label-${{ github.event.repository.name }}-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  label:
+    if: >-
+      github.actor != 'sorge-bot'
+      && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Classify and label
+        env:
+          GH_TOKEN: ${{ secrets.SORGE_BOT_TOKEN }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          DEEPSEEK_MODEL: ${{ vars.DEEPSEEK_MODEL }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_REPO: ${{ github.event.repository.name }}
+        run: python3 .github/scripts/label-issue.py

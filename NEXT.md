@@ -16,12 +16,12 @@
 
 # NOW
 
-- **Current:** 대문은 GitHub다. Forge를 ingress로 쓰자는 후보는 접었다. 라벨 레인은 호스트 RobOMP가 아니라 Actions다.
-- **Next:** (1) `sorge`에 `issues.opened|reopened` 워크플로 — 리포 체크아웃·호스트 홈 없음. 이슈 JSON만 → 모델 한 방 → `sorge-bot` PAT로 라벨 PATCH. 댓글·PR·close 없음. `priority:`/`brief:`는 추측하지 않는다.
-  → (2) sorge 한 집에서 실측(라벨 생김, 댓글 0)한 뒤, 대장 집으로 워크플로를 복제할지 재사용 워크플로로 묶을지 고른다.
+- **Current:** 대문은 GitHub다. `.github/workflows/label-issue.yml` 과 시크릿 `SORGE_BOT_TOKEN`·`DEEPSEEK_API_KEY`는 2026-09-19에 올렸다.
+- **Next:** (1) sorge에 이슈를 열거나 reopen 해 **실측** — `sorge-bot`이 `state:`/`ball:`/`house:`만 달고 댓글 0. `priority:`/`brief:` 없음.
+  → (2) 산 뒤, 대장 집으로 워크플로를 복제할지 재사용 워크플로로 묶을지 고른다.
   → (3) 4가 산 뒤에야 **5 준비**: oracle에서 pi extension 스위퍼. 참고는 RobOMP(llmlog `20260915T105735`)와 clawsweeper의 리뷰/적용 자격 분리. 상자는 봇 크리덴셜만. write를 라벨 너머로 바로 열지 않는다.
-- **Blocker:** 4번 없음. `#28`은 5번의 풀도구·호스트 실행을 막는다. Copilot 레일 금지.
-- **Read:** `labels.py` 헤더 · `LOOP.md` · llmlog `denote:20260915T105735` · `sorge#28`(5번 경계). 모델 기본값은 이미 있는 `deepseek/deepseek-flash`. 롤링 구독(GLM/Grok)으로 바꿀지는 4번 실측 때.
+- **Blocker:** 4번 실측 대기. `#28`은 5번의 풀도구·호스트 실행을 막는다. Copilot 레일 금지.
+- **Read:** `.github/workflows/label-issue.yml` · `.github/scripts/label-issue.py` · `labels.py` 헤더 · `LOOP.md` · llmlog `denote:20260915T105735` · `sorge#28`(5번 경계). Actions 모델 기본값은 `deepseek-chat`(raw API).
 - **Do not touch:**
   - stock RobOMP 호스트 루프 재기동·15집 확장
   - `oh-my-pi` fork에 줄을 넣는 것
