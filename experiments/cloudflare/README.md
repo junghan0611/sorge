@@ -34,14 +34,16 @@ UI는 현재 작업 트리가 아니라 선택한 커밋의 파일을 읽는다.
 **현재 후보는 공개 배포하지 않는다.** 공개 읽기 요청도 과금 백엔드를 반복 호출할 수 있다.
 실제 Artifacts 연결 전에 인증·요청량 상한을 정하고, 미인증 요청이 binding에 닿지 않는 테스트를 추가한다.
 
-1. Workers Paid와 Artifacts 사용 권한을 확인한다. 구독·결제는 GLG 결정.
+1. Workers Paid 결제는 사용자 완료 안내로 확인했다(2026-10-07).
+   토큰 갱신 후 thinkpad·oracle에서 namespace 목록 조회가 각각 exit 0 / `[]`로 성공했다.
+   저장소 생성·파일 읽기·Worker 실행은 아직 검증하지 않았다. 재개 좌표는 리포 루트 `NEXT.md`다.
 2. 실험 namespace/repo와 초기 commit을 준비하고 설정을 맞춘다. Artifacts repo는 변경 운반체이지 새 관리 대상 리포가 아니다.
 3. 공식 문서가 요구하는 Wrangler **4.145.0 이상**을 마련한다. 전역 도구 버전 관리는 nixos-config 담당자 몫.
 4. `cloudflare` 스킬의 토큰 경로와 dry-run → 확인 → 실행 순서를 따른다.
 5. 실제 Artifacts에서 같은 SHA를 읽어 Git 결과와 대조한다. 로컬 테스트 통과로 이 단계를 대신하지 않는다.
 
 2026-10-07 이 호스트 측정: Wrangler **4.143.0**의 `deploy --dry-run --outdir dist --autoconfig=false`는
-Artifacts binding을 인식하고 번들을 만들었다. **배포·계정 요금제 확인·실제 Artifacts 읽기는 하지 않았다.**
+Artifacts binding을 인식하고 번들을 만들었다. **배포·실제 Artifacts 파일 읽기는 하지 않았다.**
 공식 문서는 remote binding의 Blob 반환과 타입 생성을 위해 4.145.0 이상을 요구한다.
 설치된 Wrangler `wrangler-dist/cli.js:26571–26665` 판독: Artifacts는 로컬 simulator가 없고,
 `wrangler dev`에서도 원격 자원에 접근한다. 따라서 이를 결제 전 오프라인 시험으로 사용하지 않는다.
@@ -56,7 +58,7 @@ Workers 자체는 Free plan으로 실행할 수 있으나, 그것은 Artifacts �
 
 ## 근거
 
-- 논의: https://github.com/junghan0611/entwurf/issues/131
+- 논의: https://github.com/junghan0611/sorge/issues/30 (entwurf#131에서 이관)
 - 문제: https://blog.cloudflare.com/next-git-platform-on-cloudflare/
 - binding: https://developers.cloudflare.com/artifacts/api/workers-binding/
 - events: https://developers.cloudflare.com/artifacts/guides/event-subscriptions/
