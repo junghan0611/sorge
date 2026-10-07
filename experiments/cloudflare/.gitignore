@@ -1,0 +1,5 @@
+.wrangler/
+.cloudflare/
+dist/
+.dev.vars*
+.env*

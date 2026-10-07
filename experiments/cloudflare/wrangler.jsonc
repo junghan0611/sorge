@@ -1,0 +1,14 @@
+{
+	"name": "sorge-code-snapshot",
+	"main": "worker.mjs",
+	"compatibility_date": "2026-09-30",
+	"artifacts": [
+		{
+			"binding": "ARTIFACTS",
+			"namespace": "sorge-experiment"
+		}
+	],
+	"vars": {
+		"REPO_NAME": "code-snapshot"
+	}
+}
