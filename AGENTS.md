@@ -82,13 +82,14 @@ stock RobOMP 를 켰다. 그 봇은 대장 대상 리포에서 **댓글·브랜�
 금지(「남의 리포를 대신 고치는 것」)와 어긋나 보이지만 어긋나지 않는다 — **그것은 우리가
 설계한 손이 아니라 GLG 가 상류에서 받아 켠 손**이고, 우리가 그것을 좁히려고 상류 코드를
 고치는 순간 omp 버전업이 막힌다. 그래서 우리는 그 봇의 계약을 쓰지 않고 **켜고 끄는 손잡이와
-대상 판정(대장)만** 든다. 두 손의 권한 표는 `LOOP.md § mission` 에 있다.
+대상 판정(대장)만** 든다. 손의 권한 표는 `LOOP.md § mission` 에 있다.
+
+2026-10-23 GLG가 별도로 연 **workspace 발신함 응답**은 기존 Claude Code Opus가 `sorge` 스킬의 inbox 절을 내장 `/loop`로 수행한다. 허용 발신함의 요청에 원문 검토 댓글을 쓰는 것까지다. 첫 glgdot에 이어 GLG가 bbot·mini도 열었으며 정확한 저장소·ID 목록은 스킬이 든다. 코디 전달은 추후 별도 승인, 수선·PR·닫기·명시 허용 밖 발신함 확대는 미승인이다. 이는 순회 금지의 전면 해제도 stock RobOMP 재가동도 아니다. 실행 계약 실물은 `.claude/skills/sorge/SKILL.md`에만 둔다.
 
 ### 봇이 남길 때 — 저자를 밝힌다
 
 **이 절은 이 리포에서 도는 자동 에이전트에게 직접 내리는 지시다.** `sorge-bot` 으로
-뜬 stock RobOMP 턴이 여기 해당한다 — 이 파일은 워크트리 cwd 에서 자동 적재되므로
-그 턴의 시스템 프롬프트에 이미 들어 있다.
+뜬 stock RobOMP 턴과 승인된 Claude Code workspace 응답 턴이 여기 해당한다. stock과 workspace의 저자 표기를 섞지 않는다.
 
 GitHub 에 **댓글·PR 본문·이슈 본문**을 남길 때 첫 줄에 저자를 적는다:
 
@@ -96,8 +97,15 @@ GitHub 에 **댓글·PR 본문·이슈 본문**을 남길 때 첫 줄에 저자�
 Author: <모델> (omp/RobOMP sweeper as `sorge-bot`, <YYYY-MM-DD>) — 자동 판정이며 GLG 직접 발화가 아니다.
 ```
 
-**모델 이름을 추측하지 마라.** 네 env 에 있다 — `printenv ROBOMP_MODEL`. 그 값을 그대로
-쓴다(예: `deepseek/deepseek-flash`). 하네스는 `omp/RobOMP` 로 고정이다. 날짜는 오늘.
+위 형식은 **stock RobOMP 전용**이다. 그 모델은 `printenv ROBOMP_MODEL` 값으로 확인한다.
+
+**workspace 발신함**의 첫 줄은 다음 형식이다:
+
+```
+Author: <실제 모델> (Claude Code /loop as sorge-bot, <YYYY-MM-DD>) — 자동 검토이며 GLG 직접 발화가 아니다.
+```
+
+수동 검증이면 `/loop` 대신 `manual`을 쓴다. 모델은 현재 세션이 확인한 실제 ID를 쓰며 추측하지 않는다. 이 레인에서 `ROBOMP_MODEL`을 찾거나 stock 하네스명을 쓰지 않는다. 날짜는 오늘.
 
 왜 요구하나: 이 가든의 글은 **누가 말했는지가 무엇을 말했는지만큼 중요하다.** 봇 판정이
 자기진술처럼 읽히면 GLG 의 발화와 섞이고, 그 혼동은 `sorge#4` 가 이미 낸 결함이다.

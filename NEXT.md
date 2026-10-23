@@ -1,20 +1,27 @@
 # NEXT — sorge
 
 이 집은 메타 리포다. 이슈 상태는 라벨과 `./run.sh board`, 최신 계약은 live thread에 산다.
-지금 이어갈 일은 **[sorge#30](https://github.com/junghan0611/sorge/issues/30)**의 Cloudflare 협업 실험이다.
-**기존 sorge-bot과 별개다.** 자세한 이유·실측은 이슈에 두고 여기에는 다음 한 걸음만 둔다.
+지금 이어갈 일은 **[#31](https://github.com/junghan0611/sorge/issues/31)의 workspace 발신함 대응**이다(2026-10-23 GLG 요청). 기존 Opus가 당분간 대응하며 Sonnet을 새로 부르지 않는다. 별도 실행기·서비스·RobOMP를 만들거나 켜지 않는다. #30 Cloudflare는 아래 좌표에서 보류하고 #28은 미해결로 둔다.
 
 # RAIL — 현재 좌표
 
-- [x] **1. 문제와 자리** — entwurf#131 → sorge#30. 독립 형제의 동시 변경·검토·선택을 실제로 실험한다.
-- [x] **2. 로컬 시작점·독립 검수** — `fb71d3a`, `experiments/cloudflare/`, 테스트 11/11. Artifacts LIVE 증거는 아니다.
-- [x] **3. 구독·API 입구** — 사용자 Workers Paid 결제 확인. thinkpad·oracle namespace 목록 조회 성공(`[]`).
-- [ ] **4. 보호된 Worker → 실제 Artifacts → 작은 배포** ← CURRENT: oracle에서 인증·요청량 경계부터
-- [ ] **5. 실제 형제 협업** — 변경 후보·겹침·독립 검토·선택을 한 바퀴 돌고 필요한 접점을 발견한다.
+- [x] **1. 봇 인증·입구 확인** — 10/19 봇 ID·PAT `repo` 범위·private 발신함 읽기 측정.
+- [x] **2. 구동 방식·스킬 보강** — 10/23 GLG 승인으로 기존 `sorge` skill에 inbox 절 추가. 운영자는 같은 Opus, 별도 폴러 없음.
+- [x] **3. 독립 검토 → 수동 한 건 초안** — workspace-glgdot#1 gate·근거를 Opus/코디 대조, 원문 게시 없음.
+- [ ] **4. 원문 응답·반복 가동** ← CURRENT: GLG가 원문 답변과 푸시 후 루프 시작을 승인. 정리·검토·커밋·푸시 후 Opus 첫 틱.
 
-현재 좌표: 3 입구 확인 → **4 준비**. namespace/repo/Worker 생성·배포는 아직 하지 않았다.
+현재 좌표: 수동 검증 완료 → **푸시 후 가동 준비**. 원격 게시·루프 등록은 아직 하지 않았다. Entwurf 코디 전달은 추후 확장으로 미승인.
 
 # NOW
+
+- **Next:** 정리본을 Opus `20261019T123505-bfabac`가 최종 검토 → 요청된 커밋·푸시·도장 성공 → 같은 Opus에 시작 신호. `/sorge inbox`가 URL 없이 찾고 원문 답변 후 다음 wakeup을 등록한다. 허용 발신함은 스킬 표의 glgdot·bbot·mini, 운영자는 기존 Opus 하나. GLG의 후속 참여 요청에 따라 집을 추가하되 이름 패턴으로 넓히지 않는다.
+- **Read:** `.claude/skills/sorge/SKILL.md` §inbox가 실행 계약. `LOOP.md` 손 권한·`AGENTS.md` 저자 규칙을 반영했다. `experiments/workspace-inbox/DESIGN.md`는 합의와 증거. 원문 내용은 비공개에 유지하고 결정 필요·대응 막힘만 사건당 DM 한 통.
+- **Verify:** repo/author ID·private·제목/PR gate와 URL 없는 목록 발견은 코디/Opus 각 수동 측정. 시작 후 **봇 identity·댓글 URL·완료 마커로 다음 목록에서 제외·실제 다음 wakeup 접수**를 별도 확인한다. 예약 접수≠다음 틱 실행. `git diff --check`. self-paced는 재개 시 다시 시작, 7일 만료(공식 문서, 로컬 수명 실증 전).
+- **Do not touch:** 별도 실행기·timer·stock RobOMP/라벨 Actions 가동, 코디 전달·새 형제 호출·허용 표 밖 대상 확대·자동 수선·PR·닫기. 이번 허용은 허용 발신함의 원문 첫 검토 응답과 기존 Opus 루프뿐.
+
+# PAUSED — Cloudflare #30 재개 좌표
+
+로컬 시작점 `fb71d3a`, 11/11 테스트; Paid 안내·양 호스트 namespace 목록 조회까지만. 원래 RAIL 4 인증·요청량 경계부터 재개한다. namespace/repo/Worker 생성·배포는 아직 하지 않았다.
 
 - **자리:** `ssh oracle` → `/home/junghan/repos/gh/sorge`, `main`. pull은 깨끗한 tree에서 `--ff-only`만.
 - **Next:** `experiments/cloudflare/worker.mjs`에 인증·요청량 경계를 붙인다.
@@ -34,7 +41,7 @@
   계정 조작은 `cloudflare` 스킬의 토큰 경로와 dry-run → 확인 → 실행 계약을 따른다.
 - **Do not touch:** 현재 무인증 후보의 공개 배포, 비밀/토큰을 이슈·Git·출력에 넣기,
   무한 fork/재시도, 자동 머지, 형제 추가 호출의 무단 확대, 대장 대상 확대,
-  Entwurf 본체 수정, 스킬 사본 설치, sorge-bot/라벨 Actions 재기동.
+  Entwurf 본체 수정, 스킬 사본 설치, stock RobOMP/라벨 Actions 재기동.
 
 # RECENT
 
